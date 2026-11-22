@@ -63,6 +63,18 @@ func TestErrorsDoNotLeakKey(t *testing.T) {
 	}
 }
 
+func TestNoKeySkipsWebAPI(t *testing.T) {
+	called := false
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) { called = true })
+	c.APIKey = ""
+	if _, err := c.OwnedGames(context.Background(), "1"); err != ErrNoKey {
+		t.Fatalf("err = %v, want ErrNoKey", err)
+	}
+	if called {
+		t.Fatal("Web API was called without a key")
+	}
+}
+
 func TestBudget(t *testing.T) {
 	c := testClient(t, func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(`{"response":{"players":[{"steamid":"1"}]}}`)) })
 	c.budget = NewBudget(1)

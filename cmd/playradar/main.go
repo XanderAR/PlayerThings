@@ -69,6 +69,9 @@ func serve(cfg config.Config) {
 	if err != nil {
 		fail("DISCORD_PUBLIC_KEY", err)
 	}
+	if cfg.SteamAPIKey == "" {
+		log.Warn("STEAM_API_KEY is not set: Steam sign-in works, but libraries won't sync until it is")
+	}
 	steamClient := steam.New(cfg.SteamAPIKey, cfg.SteamDailyBudget)
 	sync := &syncer.Syncer{
 		Store:     st,

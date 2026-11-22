@@ -70,7 +70,6 @@ func (c Config) ValidateServe() error {
 	missing := missingKeys(map[string]string{
 		"DISCORD_APP_ID":     c.DiscordAppID,
 		"DISCORD_PUBLIC_KEY": c.DiscordPublicKey,
-		"STEAM_API_KEY":      c.SteamAPIKey,
 		"LINK_SECRET":        c.LinkSecret,
 	})
 	if len(missing) > 0 {

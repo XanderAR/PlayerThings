@@ -133,6 +133,9 @@ func (s *Syncer) tick(ctx context.Context) {
 				s.log().Warn("steam budget used up; pausing sync until tomorrow")
 				return
 			}
+			if errors.Is(err, steam.ErrNoKey) {
+				break // nothing can sync until the key is set; skip quietly
+			}
 			if err != nil && !errors.Is(err, ErrBusy) {
 				s.log().Warn("sync failed", "platform", platform, "err", err)
 			}

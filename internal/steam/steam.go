@@ -20,6 +20,10 @@ import (
 // ErrBudget is returned when the daily Web API call budget is used up.
 var ErrBudget = errors.New("steam daily API budget used up")
 
+// ErrNoKey is returned by Web API calls when no API key is configured.
+// Sign-in and store lookups don't need a key, so they keep working.
+var ErrNoKey = errors.New("STEAM_API_KEY is not set")
+
 // Client calls Steam. Create it with New.
 type Client struct {
 	APIKey    string
@@ -169,6 +173,9 @@ func (c *Client) IsMultiplayer(ctx context.Context, appID string) (multiplayer, 
 }
 
 func (c *Client) apiGet(ctx context.Context, path string, q url.Values, out any) error {
+	if c.APIKey == "" {
+		return ErrNoKey
+	}
 	if !c.budget.Take() {
 		return ErrBudget
 	}

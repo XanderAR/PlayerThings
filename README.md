@@ -48,7 +48,7 @@ You need to do these steps yourself, because they create accounts and keys.
    - Under **Bot**, reset the token. It's only needed to register commands.
    - Under **Installation**, enable **User Install** with `applications.commands`.
    - Also enable **Guild Install** with `applications.commands` and `bot`, and the **Manage Webhooks** permission.
-2. **Steam key.** Get one at <https://steamcommunity.com/dev/apikey>, using your service's domain.
+2. **Steam key.** Get one at <https://steamcommunity.com/dev/apikey>, using your service's domain. The service starts without it and Steam sign-in still works, but libraries only sync once it's set.
 3. **Deploy.** On Railway, create a service from this folder's repo; the Dockerfile is picked up automatically.
    - Add a volume mounted at `/data`.
    - Generate a domain and set it as `BASE_URL`.
