@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PlayRadar Bot Spec</title>
+<style>
+:root {
+  --bg: #f6f6f8;
+  --surface: #ffffff;
+  --text: #17171c;
+  --muted: #5d5f6b;
+  --line: #e3e3ea;
+  --accent: #6d4aff;
+  --accent-soft: #efeaff;
+  --ok: #1f8a4c;
+  --ok-soft: #e3f5ea;
+  --warn: #9a5b00;
+  --warn-soft: #fdf0dc;
+  /* Discord mock surfaces stay dark in both themes, like a screenshot */
+  --dc-bg: #313338;
+  --dc-embed: #2b2d31;
+  --dc-text: #dbdee1;
+  --dc-muted: #949ba4;
+  --dc-head: #f2f3f5;
+  --dc-link: #00a8fc;
+  --dc-btn: #4e5058;
+  --dc-btn-hover: #6d6f78;
+  --dc-blurple: #5865f2;
+  --dc-mention-bg: rgba(88, 101, 242, .3);
+  --dc-mention: #c9cdfb;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f0f13;
+    --surface: #18181f;
+    --text: #ececf1;
+    --muted: #a3a5b3;
+    --line: #2a2a35;
+    --accent: #9d86ff;
+    --accent-soft: #241d42;
+    --ok: #5fd08f;
+    --ok-soft: #15301f;
+    --warn: #f0b45a;
+    --warn-soft: #33260f;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f0f13;
+  --surface: #18181f;
+  --text: #ececf1;
+  --muted: #a3a5b3;
+  --line: #2a2a35;
+  --accent: #9d86ff;
+  --accent-soft: #241d42;
+  --ok: #5fd08f;
+  --ok-soft: #15301f;
+  --warn: #f0b45a;
+  --warn-soft: #33260f;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+a { color: var(--accent); }
+.wrap { max-width: 920px; margin: 0 auto; padding: 48px 16px 80px; }
+.eyebrow { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+h1 { font-size: clamp(34px, 6vw, 52px); line-height: 1.05; margin: 0 0 6px; letter-spacing: -.02em; }
+.sub { font-size: clamp(18px, 3vw, 22px); color: var(--muted); margin: 0 0 20px; }
+.lede { font-size: 18px; max-width: 680px; margin: 0 0 28px; }
+h2 { font-size: 24px; letter-spacing: -.01em; margin: 64px 0 16px; }
+h3 { font-size: 18px; margin: 0; }
+p { margin: 0 0 12px; }
+.muted { color: var(--muted); }
+
+.goals { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }
+.card h3 { margin-bottom: 6px; }
+.card p { margin: 0; color: var(--muted); font-size: 15px; }
+.goal-num { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 14px; margin-bottom: 10px; }
+
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.flow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; font-size: 14px; }
+.flow span { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; }
+.flow i { font-style: normal; color: var(--muted); }
+
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+tr:last-child td { border-bottom: 0; }
+td code a { text-decoration: none; }
+code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: .92em; }
+.cmd-code { font-weight: 600; white-space: nowrap; }
+
+.tag { display: inline-block; font-size: 12px; font-weight: 600; border-radius: 6px; padding: 2px 8px; margin: 0 4px 4px 0; white-space: nowrap; }
+.tag.poc { background: var(--ok-soft); color: var(--ok); }
+.tag.pgg { background: var(--warn-soft); color: var(--warn); }
+.tag.where { background: var(--accent-soft); color: var(--accent); }
+
+.cmd { margin-top: 44px; scroll-margin-top: 16px; }
+.cmd-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 6px; }
+.cmd-head h3 { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 20px; }
+.cmd > p { color: var(--muted); max-width: 720px; }
+.note { font-size: 14px; color: var(--muted); margin-top: 10px; }
+
+/* ---------- Discord mock ---------- */
+.dc { background: var(--dc-bg); color: var(--dc-text); border-radius: 12px; padding: 14px 16px 16px; font-size: 15px; line-height: 1.375; margin-top: 12px; overflow: hidden; }
+.dc + .dc { margin-top: 10px; }
+.dc-channel { color: var(--dc-muted); font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+.dc-reply { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--dc-muted); margin: 0 0 4px 56px; position: relative; flex-wrap: wrap; }
+.dc-reply::before { content: ""; position: absolute; left: -34px; top: 8px; width: 30px; height: 10px; border-left: 2px solid #4e5058; border-top: 2px solid #4e5058; border-top-left-radius: 6px; }
+.dc-reply b { color: var(--dc-text); font-weight: 500; }
+.dc-reply .slash { color: var(--dc-link); }
+.mini-av { width: 16px; height: 16px; border-radius: 50%; display: inline-block; }
+.dc-msg { display: flex; gap: 16px; }
+.dc-av { flex: 0 0 40px; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 14px; color: #fff; background: linear-gradient(135deg, #7c5cff, #3fa9ff); }
+.dc-body { min-width: 0; flex: 1; }
+.dc-headline { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 2px; }
+.dc-name { color: var(--dc-head); font-weight: 600; }
+.dc-app { background: var(--dc-blurple); color: #fff; font-size: 10px; font-weight: 700; border-radius: 4px; padding: 1px 5px; line-height: 1.4; }
+.dc-time { color: var(--dc-muted); font-size: 12px; }
+.dc-text { margin: 2px 0 6px; }
+.mention { background: var(--dc-mention-bg); color: var(--dc-mention); border-radius: 3px; padding: 0 2px; font-weight: 500; }
+.ch-mention { background: var(--dc-mention-bg); color: var(--dc-mention); border-radius: 3px; padding: 0 2px; font-weight: 500; }
+
+.embed { background: var(--dc-embed); border-left: 4px solid var(--e, #7c5cff); border-radius: 4px; padding: 10px 16px 14px 12px; max-width: 520px; margin: 4px 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 16px; }
+.embed > * { grid-column: 1; }
+.embed .thumb { grid-column: 2; grid-row: 1 / span 4; width: 80px; height: 80px; border-radius: 6px; }
+.e-author { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--dc-head); margin: 4px 0 2px; }
+.e-title { color: var(--dc-head); font-weight: 600; margin: 4px 0 2px; }
+.e-title.link { color: var(--dc-link); }
+.e-desc { font-size: 14px; margin: 4px 0; }
+.e-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 12px; margin-top: 8px; }
+.e-field { min-width: 0; }
+.e-field.wide { grid-column: 1 / -1; }
+.e-field b { display: block; color: var(--dc-head); font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+.e-field div { font-size: 14px; }
+.e-footer { font-size: 12px; color: var(--dc-muted); margin-top: 10px; }
+.e-image { grid-column: 1 / -1; margin-top: 12px; }
+.rank { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 2px 6px; font-size: 14px; align-items: baseline; }
+.rank .n { color: var(--dc-muted); }
+.rank .h { color: var(--dc-head); font-variant-numeric: tabular-nums; text-align: right; }
+.rank .sm { color: var(--dc-muted); font-size: 12px; }
+.up { color: #23a55a; font-size: 12px; font-weight: 600; }
+.stars { color: #f0b232; font-weight: 700; }
+blockquote.q { margin: 6px 0; padding-left: 10px; border-left: 3px solid #4e5058; font-size: 14px; }
+
+.covers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 6px; }
+.cover { aspect-ratio: 3 / 4; border-radius: 6px; padding: 6px; display: flex; align-items: flex-end; font-size: 11px; font-weight: 700; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.6); line-height: 1.15; }
+.wide-art { height: 120px; border-radius: 6px; padding: 12px; display: flex; align-items: flex-end; font-weight: 800; color: #fff; font-size: 20px; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+.g1 { background: linear-gradient(160deg, #ff7a59, #8a1f6a); }
+.g2 { background: linear-gradient(160deg, #3fa9ff, #1d2b7a); }
+.g3 { background: linear-gradient(160deg, #ffd166, #b5179e); }
+.g4 { background: linear-gradient(160deg, #06d6a0, #11487a); }
+.g5 { background: linear-gradient(160deg, #a2d729, #1b5e20); }
+.g6 { background: linear-gradient(160deg, #f15bb5, #3a0ca3); }
+.g7 { background: linear-gradient(160deg, #00f5d4, #7209b7); }
+.g8 { background: linear-gradient(160deg, #ffb703, #c1121f); }
+
+.xp { height: 8px; background: #1e1f22; border-radius: 99px; overflow: hidden; margin: 6px 0 2px; }
+.xp > span { display: block; height: 100%; background: linear-gradient(90deg, #7c5cff, #3fa9ff); }
+.quest { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 8px; font-size: 14px; padding: 6px 0; border-top: 1px solid #3f4147; }
+.quest:first-of-type { border-top: 0; }
+.quest .xpv { color: #c9cdfb; font-weight: 600; white-space: nowrap; }
+.done { color: #23a55a; }
+
+.dc-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border-radius: 4px; font-size: 14px; font-weight: 500; color: #fff; background: var(--dc-btn); text-decoration: none; border: 0; cursor: default; }
+.btn.primary { background: var(--dc-blurple); }
+.btn.success { background: #248046; }
+.btn.danger { background: #da373c; }
+.btn svg { width: 14px; height: 14px; opacity: .85; }
+.dc-eph { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dc-muted); margin-top: 8px; }
+.dc-eph a { color: var(--dc-link); text-decoration: none; }
+
+.modal { background: #313338; border: 1px solid #1e1f22; border-radius: 8px; max-width: 440px; padding: 18px; margin: 4px 0; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+.modal h4 { margin: 0 0 14px; color: var(--dc-head); font-size: 18px; }
+.m-label { font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--dc-muted); margin: 10px 0 6px; letter-spacing: .02em; }
+.m-input { background: #1e1f22; border-radius: 4px; padding: 10px; font-size: 14px; color: var(--dc-text); min-height: 40px; }
+.m-input.area { min-height: 78px; }
+.m-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+.m-actions span { padding: 8px 14px; font-size: 14px; }
+
+.split { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.split ul { margin: 8px 0 0; padding-left: 18px; color: var(--muted); font-size: 15px; }
+.split li { margin: 4px 0; }
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.metric b { display: block; font-size: 15px; margin-bottom: 2px; }
+.metric span { color: var(--muted); font-size: 14px; }
+footer { margin-top: 64px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; }
+
+@media (max-width: 560px) {
+  .wrap { padding-top: 32px; }
+  .dc { padding: 12px; }
+  .dc-msg { gap: 10px; }
+  .dc-av { flex-basis: 32px; width: 32px; height: 32px; font-size: 12px; }
+  .dc-reply { margin-left: 42px; }
+  .dc-reply::before { left: -26px; width: 22px; }
+  .embed { padding: 8px 10px 12px 10px; }
+  .embed .thumb { width: 56px; height: 56px; }
+  .e-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="ext" viewBox="0 0 24 24"><path fill="currentColor" d="M14 3h7v7h-2V6.41l-9.29 9.3-1.42-1.42 9.3-9.29H14V3zM5 5h6v2H5v12h12v-6h2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/></symbol>
+</svg>
+
+<main class="wrap">
+  <p class="eyebrow">Product spec · working name</p>
+  <h1>PlayRadar</h1>
+  <p class="sub">player.gg inside Discord</p>
+  <p class="lede">A Discord app that brings player.gg's playtests, shelves and reviews into the servers where people already talk about games. Everything it posts is one click away from player.gg.</p>
+
+  <div class="goals">
+    <div class="card">
+      <div class="goal-num">1</div>
+      <h3>Another way to experience player.gg</h3>
+      <p>Players browse playtests, show off their shelf, review games and track quests without leaving Discord.</p>
+    </div>
+    <div class="card">
+      <div class="goal-num">2</div>
+      <h3>A steady path to player.gg</h3>
+      <p>Every card carries a player.gg button. Each one a player posts is seen by everyone in the channel, and sign-ups are credited to the server they came from.</p>
+    </div>
+  </div>
+
+  <h2>How it works</h2>
+  <div class="steps">
+    <div class="card"><h3>Link once</h3><p>Connect a player.gg account, plus Steam and PlayStation for playtime. One link works in every server.</p></div>
+    <div class="card"><h3>Use it anywhere</h3><p>Install it to your account for DMs and any server, or add it to a server so everyone there gets the shared features.</p></div>
+    <div class="card"><h3>Results lead back</h3><p>Profiles, games, playtests and reviews open on player.gg. Members only appear on a server's leaderboards if they opt in.</p></div>
+  </div>
+  <div class="flow" aria-label="Growth loop">
+    <span>Someone runs a command</span><i>→</i>
+    <span>The whole channel sees the card</span><i>→</i>
+    <span>They click through to player.gg</span><i>→</i>
+    <span>They link and run their own</span>
+  </div>
+
+  <h2>Commands</h2>
+  <p class="muted"><span class="tag poc">Proof of concept</span> works now with public Steam data. <span class="tag pgg">Needs player.gg data</span> needs access to player.gg's profiles, playtests or quests.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Command</th><th>What it does</th><th>Stage</th></tr></thead>
+      <tbody>
+        <tr><td><code class="cmd-code"><a href="#link">/link</a></code></td><td>Connect player.gg, Steam and PlayStation</td><td><span class="tag poc">PoC: Steam</span></td></tr>
+        <tr><td><code class="cmd-code"><a href="#profile">/profile</a></code></td><td>Shareable card of a player's shelf and playtime</td><td><span class="tag poc">PoC: Steam</span><span class="tag pgg">Shelf, XP</span></td></tr>
+        <tr><td><code class="cmd-code"><a href="#playtests">/playtests</a></code></td><td>Live and upcoming playtests with one-click sign-up</td><td><span class="tag poc">PoC: curated</span><span class="tag pgg">Live feed</span></td></tr>
+        <tr><td><code class="cmd-code"><a href="#radar">/radar</a></code></td><td>Auto-posts playtests that match what the server plays</td><td><span class="tag poc">PoC</span></td></tr>
+        <tr><td><code class="cmd-code"><a href="#whoplays">/whoplays</a></code></td><td>Who in this server plays a game, top player gets the crown</td><td><span class="tag poc">PoC</span></td></tr>
+        <tr><td><code class="cmd-code"><a href="#incommon">/incommon</a></code></td><td>Multiplayer games a group all owns</td><td><span class="tag poc">PoC</span></td></tr>
+        <tr><td><code class="cmd-code"><a href="#chart">/chart</a></code></td><td>The server's most-played games, posted weekly</td><td><span class="tag poc">PoC</span></td></tr>
+        <tr><td><code class="cmd-code"><a href="#review">/review</a></code></td><td>Rate and review a game, saved to player.gg</td><td><span class="tag pgg">Needs player.gg</span></td></tr>
+        <tr><td><code class="cmd-code"><a href="#quests">/quests</a></code></td><td>Your quests, XP and rewards to claim</td><td><span class="tag pgg">Needs player.gg</span></td></tr>
+        <tr><td><code class="cmd-code"><a href="#curator">/curator</a></code></td><td>A curator's posts and collections in their own server</td><td><span class="tag pgg">Needs player.gg</span></td></tr>
+        <tr><td><code class="cmd-code"><a href="#goty">/goty</a></code></td><td>Server game-of-the-year vote that feeds player.gg's GOTY</td><td><span class="tag pgg">Needs player.gg</span></td></tr>
+        <tr><td><code class="cmd-code"><a href="#privacy">/visibility</a>, <a href="#privacy">/unlink</a></code></td><td>Hide yourself in a server, or delete everything</td><td><span class="tag poc">PoC</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- /link -->
+  <section class="cmd" id="link">
+    <div class="cmd-head"><h3>/link</h3><span class="tag where">Anywhere</span><span class="tag poc">PoC: Steam via the bot's own page</span></div>
+    <p>Connect accounts once. Only the person who ran it sees the reply.</p>
+    <div class="dc">
+      <div class="dc-reply"><span class="mini-av g4"></span><b>mara</b> used <span class="slash">/link</span></div>
+      <div class="dc-msg">
+        <div class="dc-av">PR</div>
+        <div class="dc-body">
+          <div class="dc-headline"><span class="dc-name">PlayRadar</span><span class="dc-app">APP</span><span class="dc-time">Today at 9:41 PM</span></div>
+          <div class="embed">
+            <div class="e-title">Connect your accounts</div>
+            <div class="e-desc">Link once and your shelf, playtime and playtests follow you into every server.</div>
+            <div class="e-fields">
+              <div class="e-field"><b>player.gg</b><div>Your shelf, reviews and XP</div></div>
+              <div class="e-field"><b>Steam</b><div>Library and playtime sync daily</div></div>
+              <div class="e-field"><b>PlayStation</b><div>Played games and trophies</div></div>
+            </div>
+            <div class="e-footer">Linking here adds you to Night Shift's leaderboards. Change it any time with /visibility.</div>
+          </div>
+          <div class="dc-buttons">
+            <a class="btn">Sign in with player.gg <svg><use href="#ext"/></svg></a>
+            <a class="btn">Link Steam <svg><use href="#ext"/></svg></a>
+            <a class="btn">Link PlayStation <svg><use href="#ext"/></svg></a>
+          </div>
+          <div class="dc-eph">Only you can see this · <a>Dismiss message</a></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- /profile -->
+  <section class="cmd" id="profile">
+    <div class="cmd-head"><h3>/profile [@player]</h3><span class="tag where">Anywhere</span><span class="tag poc">PoC: Steam stats</span><span class="tag pgg">Shelf, reviews, XP</span></div>
+    <p>The card people share. In a server, it only shows members who opted in there.</p>
+    <div class="dc">
+      <div class="dc-reply"><span class="mini-av g2"></span><b>dex</b> used <span class="slash">/profile</span> <span class="mention">@mara</span></div>
+      <div class="dc-msg">
+        <div class="dc-av">PR</div>
+        <div class="dc-body">
+          <div class="dc-headline"><span class="dc-name">PlayRadar</span><span class="dc-app">APP</span><span class="dc-time">Today at 9:43 PM</span></div>
+          <div class="embed">
+            <div class="thumb g4"></div>
+            <div class="e-author">mara · player.gg/@mara</div>
+            <div class="e-title link">Mara's shelf</div>
+            <div class="e-fields">
+              <div class="e-field"><b>Played</b><div>1,284 h</div></div>
+              <div class="e-field"><b>Shelf</b><div>312 games</div></div>
+              <div class="e-field"><b>Level</b><div>12 · 14 reviews</div></div>
+              <div class="e-field wide"><b>Favorites</b>
+                <div class="covers">
+                  <div class="cover g1">Hades II</div>
+                  <div class="cover g2">Outer Wilds</div>
+                  <div class="cover g3">Balatro</div>
+                  <div class="cover g6">Disco Elysium</div>
+                </div>
+              </div>
+              <div class="e-field wide"><b>Most played on Steam</b>
+                <div class="rank">
+                  <span class="n">1</span><span>Deep Rock Galactic</span><span class="h">412 h</span>
+                  <span class="n">2</span><span>Counter-Strike 2</span><span class="h">301 h</span>
+                  <span class="n">3</span><span>Hades II</span><span class="h">96 h</span>
+                </div>
+              </div>
+              <div class="e-field wide"><b>Latest review</b>
+                <div><span class="stars">9.5</span> Outer Wilds</div>
+                <blockquote class="q">The only game I wish I could forget, just to play it again.</blockquote>
+              </div>
+            </div>
+            <div class="e-footer">3 playtests joined · Steam synced 2 hours ago</div>
+          </div>
+          <div class="dc-buttons">
+            <a class="btn">View shelf on player.gg <svg><use href="#ext"/></svg></a>
+            <a class="btn">Follow mara <svg><use href="#ext"/></svg></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- /playtests -->
+  <section class="cmd" id="playtests">
+    <div class="cmd-head"><h3>/playtests [genre]</h3><span class="tag where">Anywhere</span><span class="tag poc">PoC: curated list</span><span class="tag pgg">Live network feed</span></div>
+    <p>The main reason servers add it. "Request access" opens player.gg's one-click sign-up, credited to this server.</p>
+    <div class="dc">
+      <div class="dc-reply"><span class="mini-av g3"></span><b>kiko</b> used <span class="slash">/playtests</span></div>
+      <div class="dc-msg">
+        <div class="dc-av">PR</div>
+        <div class="dc-body">
+          <div class="dc-headline"><span class="dc-name">PlayRadar</span><span class="dc-app">APP</span><span class="dc-time">Today at 9:45 PM</span></div>
+          <div class="dc-text">2 playtests are live and 1 starts soon.</div>
+          <div class="embed" style="--e:#23a55a">
+            <div class="thumb g8"></div>
+            <div class="e-title link">Starfall Outriders</div>
+            <div class="e-desc">Four-player co-op shooter. Closed alpha, feedback goes straight to the team.</div>
+            <div class="e-fields">
+              <div class="e-field"><b>Status</b><div>Live until Nov 30</div></div>
+              <div class="e-field"><b>Platforms</b><div>PC</div></div>
+              <div class="e-field"><b>Studio</b><div>Lumen Forge</div></div>
+            </div>
+          </div>
+          <div class="embed" style="--e:#23a55a">
+            <div class="thumb g5"></div>
+            <div class="e-title link">Mossbound</div>
+            <div class="e-desc">Cozy farming roguelite. Playtesters get an exclusive pet at launch.</div>
+            <div class="e-fields">
+              <div class="e-field"><b>Status</b><div>Live until Dec 2</div></div>
+              <div class="e-field"><b>Platforms</b><div>PC, PS5</div></div>
+              <div class="e-field"><b>Studio</b><div>Little Fern</div></div>
+            </div>
+          </div>
+          <div class="embed" style="--e:#f0b232">
+            <div class="thumb g7"></div>
+            <div class="e-title link">Neon Courier</div>
+            <div class="e-fields">
+              <div class="e-field"><b>Status</b><div>Starts Dec 5</div></div>
+              <div class="e-field"><b>Platforms</b><div>PC</div></div>
+              <div class="e-field"><b>Studio</b><div>Gridline</div></div>
+            </div>
+            <div class="e-footer">Sign-ups from here count for Night Shift · playtests on player.gg</div>
+          </div>
+          <div class="dc-buttons">
+            <a class="btn">Request access: Starfall Outriders <svg><use href="#ext"/></svg></a>
+            <a class="btn">Request access: Mossbound <svg><use href="#ext"/></svg></a>
+            <a class="btn">Wishlist Neon Courier <svg><use href="#ext"/></svg></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- /radar -->
+  <section class="cmd" id="radar">
+    <div class="cmd-head"><h3>/radar #channel</h3><span class="tag where">Server admins</span><span class="tag poc">PoC</span></div>
+    <p>An admin picks a channel once. New playtests that match what members actually play get posted there automatically.</p>
+    <div class="dc">
+      <div class="dc-channel"># playtests</div>
+      <div class="dc-msg">
+        <div class="dc-av">PR</div>
+        <div class="dc-body">
+          <div class="dc-headline"><span class="dc-name">PlayRadar</span><span class="dc-app">APP</span><span class="dc-time">Today at 6:00 PM</span></div>
+          <div class="embed" style="--e:#23a55a">
+            <div class="e-author">New playtest that fits this server</div>
+            <div class="e-title link">Starfall Outriders · live now</div>
+            <div class="e-desc"><b>9 members here</b> play co-op shooters like Deep Rock Galactic and Helldivers 2. Closed alpha until Nov 30.</div>
+            <div class="e-image"><div class="wide-art g8">Starfall Outriders</div></div>
+          </div>
+          <div class="dc-buttons">
+            <a class="btn">Request access <svg><use href="#ext"/></svg></a>
+            <a class="btn">Game page on player.gg <svg><use href="#ext"/></svg></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- /whoplays -->
+  <section class="cmd" id="whoplays">
+    <div class="cmd-head"><h3>/whoplays &lt;game&gt;</h3><span class="tag where">In servers</span><span class="tag poc">PoC</span></div>
+    <p>Finds teammates and starts friendly competition. The game name autocompletes from what members own.</p>
+    <div class="dc">
+      <div class="dc-reply"><span class="mini-av g1"></span><b>rowan</b> used <span class="slash">/whoplays</span> Deep Rock Galactic</div>
+      <div class="dc-msg">
+        <div class="dc-av">PR</div>
+        <div class="dc-body">
+          <div class="dc-headline"><span class="dc-name">PlayRadar</span><span class="dc-app">APP</span><span class="dc-time">Today at 9:47 PM</span></div>
+          <div class="embed" style="--e:#f0b232">
+            <div class="thumb g4"></div>
+            <div class="e-title link">Who plays Deep Rock Galactic</div>
+            <div class="rank" style="margin-top:6px">
+              <span class="n">👑</span><span><span class="mention">@mara</span> <span class="sm">6 h this fortnight</span></span><span class="h">412 h</span>
+              <span class="n">2</span><span><span class="mention">@dex</span> <span class="sm">11 h this fortnight</span></span><span class="h">288 h</span>
+              <span class="n">3</span><span><span class="mention">@kiko</span></span><span class="h">140 h</span>
+              <span class="n">4</span><span><span class="mention">@rowan</span></span><span class="h">37 h</span>
+            </div>
+            <div class="e-footer">4 of 23 linked members own it · /link to get on the list</div>
+          </div>
+          <div class="dc-buttons">
+            <a class="btn">Game page on player.gg <svg><use href="#ext"/></svg></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- /incommon -->
+  <section class="cmd" id="incommon">
+    <div class="cmd-head"><h3>/incommon @friends</h3><span class="tag where">In servers</span><span class="tag poc">PoC</span></div>
+    <p>Settles "what should we play tonight". Multiplayer games come first, using Steam's store tags.</p>
+    <div class="dc">
+      <div class="dc-reply"><span class="mini-av g4"></span><b>mara</b> used <span class="slash">/incommon</span> <span class="mention">@dex</span> <span class="mention">@kiko</span></div>
+      <div class="dc-msg">
+        <div class="dc-av">PR</div>
+        <div class="dc-body">
+          <div class="dc-headline"><span class="dc-name">PlayRadar</span><span class="dc-app">APP</span><span class="dc-time">Today at 9:50 PM</span></div>
+          <div class="embed" style="--e:#3fa9ff">
+            <div class="e-title">Games you all own</div>
+            <div class="e-desc"><span class="mention">@mara</span> <span class="mention">@dex</span> <span class="mention">@kiko</span></div>
+            <div class="e-fields">
+              <div class="e-field wide"><b>Multiplayer</b>
+                <div class="rank">
+                  <span class="n">1</span><span>Deep Rock Galactic</span><span class="h">840 h combined</span>
+                  <span class="n">2</span><span>Helldivers 2</span><span class="h">312 h</span>
+                  <span class="n">3</span><span>Lethal Company</span><span class="h">96 h</span>
+                </div>
+              </div>
+              <div class="e-field wide"><b>Also on all three shelves</b><div>Hades II, Balatro, Outer Wilds</div></div>
+            </div>
+          </div>
+          <div class="dc-buttons">
+            <a class="btn">Compare shelves on player.gg <svg><use href="#ext"/></svg></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- /chart -->
+  <section class="cmd" id="chart">
+    <div class="cmd-head"><h3>/chart</h3><span class="tag where">In servers</span><span class="tag poc">PoC</span></div>
+    <p>Run it any time, or let it post every Monday. A weekly ritual that keeps the app visible.</p>
+    <div class="dc">
+      <div class="dc-channel"># gaming</div>
+      <div class="dc-msg">
+        <div class="dc-av">PR</div>
+        <div class="dc-body">
+          <div class="dc-headline"><span class="dc-name">PlayRadar</span><span class="dc-app">APP</span><span class="dc-time">Monday at 10:00 AM</span></div>
+          <div class="embed" style="--e:#7c5cff">
+            <div class="thumb g2"></div>
+            <div class="e-title">Night Shift · most played this fortnight</div>
+            <div class="rank" style="margin-top:6px">
+              <span class="n">1</span><span>Helldivers 2 <span class="up">▲2</span></span><span class="h">64 h · 7 players</span>
+              <span class="n">2</span><span>Deep Rock Galactic</span><span class="h">51 h · 5</span>
+              <span class="n">3</span><span>Counter-Strike 2</span><span class="h">38 h · 4</span>
+              <span class="n">4</span><span>Balatro <span class="up">NEW</span></span><span class="h">22 h · 6</span>
+              <span class="n">5</span><span>Hades II</span><span class="h">18 h · 3</span>
+            </div>
+            <div class="e-footer">From 23 linked members · posts every Monday</div>
+          </div>
+          <div class="dc-buttons">
+            <a class="btn">Server page on player.gg <svg><use href="#ext"/></svg></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- /review -->
+  <section class="cmd" id="review">
+    <div class="cmd-head"><h3>/review &lt;game&gt;</h3><span class="tag where">Anywhere</span><span class="tag pgg">Needs player.gg</span></div>
+    <p>A pop-up form saves the review to player.gg, then posts a card to the channel.</p>
+    <div class="dc">
+      <div class="modal">
+        <h4>Review Outer Wilds</h4>
+        <div class="m-label">Rating (1 to 10)</div>
+        <div class="m-input">9.5</div>
+        <div class="m-label">Your review (optional)</div>
+        <div class="m-input area">The only game I wish I could forget, just to play it again.</div>
+        <div class="m-actions"><span>Cancel</span><span class="btn primary">Post to player.gg</span></div>
+      </div>
+    </div>
+    <div class="dc">
+      <div class="dc-reply"><span class="mini-av g4"></span><b>mara</b> used <span class="slash">/review</span> Outer Wilds</div>
+      <div class="dc-msg">
+        <div class="dc-av">PR</div>
+        <div class="dc-body">
+          <div class="dc-headline"><span class="dc-name">PlayRadar</span><span class="dc-app">APP</span><span class="dc-time">Today at 9:52 PM</span></div>
+          <div class="embed" style="--e:#f0b232">
+            <div class="thumb g2"></div>
+            <div class="e-author">mara reviewed</div>
+            <div class="e-title link">Outer Wilds</div>
+            <div class="e-desc"><span class="stars">9.5 / 10</span> · Completed · 31 h on Steam</div>
+            <blockquote class="q">The only game I wish I could forget, just to play it again.</blockquote>
+          </div>
+          <div class="dc-buttons">
+            <a class="btn">Read on player.gg <svg><use href="#ext"/></svg></a>
+            <a class="btn">Add to my shelf <svg><use href="#ext"/></svg></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- /quests -->
+  <section class="cmd" id="quests">
+    <div class="cmd-head"><h3>/quests</h3><span class="tag where">Anywhere</span><span class="tag pgg">Needs player.gg</span></div>
+    <p>Quest progress from player.gg. Claiming rewards happens on player.gg, which brings players back.</p>
+    <div class="dc">
+      <div class="dc-reply"><span class="mini-av g3"></span><b>kiko</b> used <span class="slash">/quests</span></div>
+      <div class="dc-msg">
+        <div class="dc-av">PR</div>
+        <div class="dc-body">
+          <div class="dc-headline"><span class="dc-name">PlayRadar</span><span class="dc-app">APP</span><span class="dc-time">Today at 9:54 PM</span></div>
+          <div class="embed" style="--e:#c9cdfb">
+            <div class="e-title">Level 12 · 2,340 / 3,000 XP</div>
+            <div class="xp"><span style="width:78%"></span></div>
+            <div style="margin-top:8px">
+              <div class="quest"><span>◻</span><span>Play the Starfall Outriders playtest for 1 hour<br><span class="sm" style="color:var(--dc-muted);font-size:12px">Reward: exclusive outrider cosmetic</span></span><span class="xpv">+200 XP</span></div>
+              <div class="quest"><span>◻</span><span>Join the Mossbound community server</span><span class="xpv">+25 XP</span></div>
+              <div class="quest"><span class="done">✓</span><span>Review a game you finished</span><span class="xpv done">+50 XP</span></div>
+            </div>
+          </div>
+          <div class="dc-buttons">
+            <a class="btn">Claim rewards on player.gg <svg><use href="#ext"/></svg></a>
+          </div>
+          <div class="dc-eph">Only you can see this · <a>Dismiss message</a></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- /curator -->
+  <section class="cmd" id="curator">
+    <div class="cmd-head"><h3>/curator feed #channel</h3><span class="tag where">Server admins</span><span class="tag pgg">Needs player.gg</span></div>
+    <p>Curators post their player.gg picks straight into their own communities. A fast way into servers that already exist.</p>
+    <div class="dc">
+      <div class="dc-channel"># recommendations</div>
+      <div class="dc-msg">
+        <div class="dc-av">PR</div>
+        <div class="dc-body">
+          <div class="dc-headline"><span class="dc-name">PlayRadar</span><span class="dc-app">APP</span><span class="dc-time">Today at 12:00 PM</span></div>
+          <div class="embed" style="--e:#f15bb5">
+            <div class="e-author">New collection from Pixel Pilgrim</div>
+            <div class="e-title link">Cozy co-op for the long winter</div>
+            <div class="e-desc">Eight games to play with a friend and a hot drink.</div>
+            <div class="covers">
+              <div class="cover g5">Mossbound</div>
+              <div class="cover g3">Stardew Valley</div>
+              <div class="cover g6">It Takes Two</div>
+              <div class="cover g4">+5 more</div>
+            </div>
+          </div>
+          <div class="dc-buttons">
+            <a class="btn">Open collection <svg><use href="#ext"/></svg></a>
+            <a class="btn">Follow Pixel Pilgrim <svg><use href="#ext"/></svg></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- /goty -->
+  <section class="cmd" id="goty">
+    <div class="cmd-head"><h3>/goty</h3><span class="tag where">In servers, December</span><span class="tag pgg">Needs player.gg</span></div>
+    <p>A seasonal vote built from what members played this year. Results feed player.gg's community GOTY.</p>
+    <div class="dc">
+      <div class="dc-channel"># gaming</div>
+      <div class="dc-msg">
+        <div class="dc-av">PR</div>
+        <div class="dc-body">
+          <div class="dc-headline"><span class="dc-name">PlayRadar</span><span class="dc-app">APP</span><span class="dc-time">Dec 1 at 10:00 AM</span></div>
+          <div class="embed" style="--e:#f0b232">
+            <div class="e-title">Night Shift's Game of the Year 2026</div>
+            <div class="e-desc">Vote for up to three. Nominees are the games members played most this year.</div>
+            <div class="rank" style="margin-top:6px">
+              <span class="n">1</span><span>Hades II</span><span class="h">11 votes</span>
+              <span class="n">2</span><span>Helldivers 2</span><span class="h">8 votes</span>
+              <span class="n">3</span><span>Balatro</span><span class="h">6 votes</span>
+            </div>
+            <div class="e-footer">Voting closes Dec 15 · results go to player.gg's community GOTY</div>
+          </div>
+          <div class="dc-buttons">
+            <span class="btn primary">Hades II</span>
+            <span class="btn primary">Helldivers 2</span>
+            <span class="btn primary">Balatro</span>
+            <span class="btn">More nominees</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- privacy -->
+  <section class="cmd" id="privacy">
+    <div class="cmd-head"><h3>/visibility · /unlink</h3><span class="tag where">Anywhere</span><span class="tag poc">PoC</span></div>
+    <p>Members choose which servers can see them. <code>/unlink</code> deletes everything stored about them.</p>
+    <div class="dc">
+      <div class="dc-reply"><span class="mini-av g2"></span><b>dex</b> used <span class="slash">/unlink</span></div>
+      <div class="dc-msg">
+        <div class="dc-av">PR</div>
+        <div class="dc-body">
+          <div class="dc-headline"><span class="dc-name">PlayRadar</span><span class="dc-app">APP</span><span class="dc-time">Today at 9:58 PM</span></div>
+          <div class="dc-text">This deletes your linked accounts, synced games and server settings. It can't be undone.</div>
+          <div class="dc-buttons">
+            <span class="btn danger">Delete my data</span>
+            <span class="btn">Cancel</span>
+          </div>
+          <div class="dc-eph">Only you can see this · <a>Dismiss message</a></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <h2>Beyond commands</h2>
+  <div class="cmd" style="margin-top:0">
+    <div class="cmd-head"><h3 style="font-family:inherit">Pasted player.gg links</h3><span class="tag pgg">Change on player.gg's side</span></div>
+    <p>Discord now lets a site define a rich card for its links. Any player.gg link pasted in any server, even one without the app, shows a card with buttons.</p>
+    <div class="dc">
+      <div class="dc-msg">
+        <div class="dc-av" style="background:linear-gradient(135deg,#ff7a59,#8a1f6a)">S</div>
+        <div class="dc-body">
+          <div class="dc-headline"><span class="dc-name">sully</span><span class="dc-time">Today at 10:02 PM</span></div>
+          <div class="dc-text">this looks sick <span style="color:var(--dc-link)">https://player.gg/games/starfall-outriders</span></div>
+          <div class="embed" style="--e:#23a55a">
+            <div class="e-author">player.gg</div>
+            <div class="e-title link">Starfall Outriders · Playtest live</div>
+            <div class="e-desc">Four-player co-op shooter. 2,410 players signed up.</div>
+            <div class="e-image"><div class="wide-art g8">Starfall Outriders</div></div>
+          </div>
+          <div class="dc-buttons">
+            <a class="btn">Request access <svg><use href="#ext"/></svg></a>
+            <a class="btn">Wishlist <svg><use href="#ext"/></svg></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>What success looks like</h2>
+  <div class="metrics">
+    <div class="card metric"><b>Linked players</b><span>Per server, and the share of each server that links</span></div>
+    <div class="card metric"><b>Clicks to player.gg</b><span>From every button, tagged by command and server</span></div>
+    <div class="card metric"><b>Playtest sign-ups</b><span>Credited to the server they came from, visible to studios</span></div>
+    <div class="card metric"><b>Weekly active servers</b><span>Servers where someone ran a command or got a weekly post</span></div>
+  </div>
+
+  <h2>Proof of concept, then the full version</h2>
+  <div class="split">
+    <div class="card">
+      <h3>Proof of concept</h3>
+      <ul>
+        <li>Steam linking through the bot's own page</li>
+        <li><code>/profile</code>, <code>/whoplays</code>, <code>/incommon</code>, <code>/chart</code> from Steam data</li>
+        <li><code>/playtests</code> and <code>/radar</code> from a hand-curated list of public playtest pages</li>
+        <li>Every button already points at player.gg</li>
+        <li>No special Discord permissions, no reading messages</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>With player.gg data</h3>
+      <ul>
+        <li>Sign in with player.gg; Steam and PlayStation come through player.gg's own sync</li>
+        <li>Shelf, reviews, XP and quests on cards</li>
+        <li>Live playtest feed with sign-ups credited per server</li>
+        <li><code>/review</code>, <code>/curator</code>, <code>/goty</code></li>
+        <li>Rich cards for pasted player.gg links</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer>Concept for discussion, not an official player.gg product. Game titles are real examples; the playtests, studios, curator and players shown are made up.</footer>
+</main>
+</body>
+</html>

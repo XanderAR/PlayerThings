@@ -1,0 +1,14 @@
+[
+  {
+    "title": "Example Co-op Shooter",
+    "studio": "Example Studio",
+    "url": "https://player.gg/playtests",
+    "image": "",
+    "summary": "Replace this with a real playtest from a public player.gg page, then save it as playtests.json.",
+    "platforms": ["PC"],
+    "genres": ["Shooter", "Co-op"],
+    "starts": "2026-11-20",
+    "ends": "2026-12-01",
+    "similar_steam_apps": ["548430", "553850"]
+  }
+]
