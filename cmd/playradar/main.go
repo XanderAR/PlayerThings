@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"text/tabwriter"
 	"time"
@@ -61,7 +62,8 @@ func main() {
 func preview(cfg config.Config, args []string) {
 	fs := flag.NewFlagSet("preview", flag.ExitOnError)
 	channel := fs.String("channel", "", "post the cards in this channel (the bot needs to be able to send messages there)")
-	you := fs.String("you", "preview-you", "Discord user ID to show as the person running the commands")
+	you := fs.String("you", "100000000000000000", "Discord user ID to show as the person running the commands")
+	only := fs.String("only", "", "comma-separated words; only cards whose name contains one of them")
 	fs.Parse(args)
 
 	dir, err := os.MkdirTemp("", "playradar-preview")
@@ -73,6 +75,18 @@ func preview(cfg config.Config, args []string) {
 	cards, err := bot.Preview(ctx, dir, cfg.PlaytestsFile, cfg.BaseURL, *you)
 	if err != nil {
 		fail("render preview", err)
+	}
+	if *only != "" {
+		var kept []bot.PreviewCard
+		for _, c := range cards {
+			for _, w := range strings.Split(*only, ",") {
+				if w = strings.TrimSpace(w); w != "" && strings.Contains(strings.ToLower(c.Name), strings.ToLower(w)) {
+					kept = append(kept, c)
+					break
+				}
+			}
+		}
+		cards = kept
 	}
 	var rest *discord.Client
 	if *channel != "" {
