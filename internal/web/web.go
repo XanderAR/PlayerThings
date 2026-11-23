@@ -5,6 +5,7 @@ package web
 
 import (
 	"context"
+	_ "embed"
 	"errors"
 	"html/template"
 	"log/slog"
@@ -18,6 +19,11 @@ import (
 	"playradar/internal/render"
 	"playradar/internal/store"
 )
+
+// iconPNG is the app icon, used as the avatar on scheduled webhook posts.
+//
+//go:embed static/icon.png
+var iconPNG []byte
 
 // SteamAuth is Steam's OpenID sign-in.
 type SteamAuth interface {
@@ -58,6 +64,11 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /privacy", s.privacy)
 	mux.HandleFunc("GET /terms", s.terms)
 	mux.HandleFunc("GET /render/shelf.jpg", s.shelf)
+	mux.HandleFunc("GET /icon.png", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		w.Write(iconPNG)
+	})
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	return securityHeaders(mux)
 }
