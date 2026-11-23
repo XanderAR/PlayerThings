@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"playradar/internal/discord"
+	"playradar/internal/render"
 	"playradar/internal/store"
 )
 
@@ -85,9 +86,7 @@ func (b *Bot) whoPlaysCard(ctx context.Context, guildID string, game store.Game)
 		lines = append(lines, "Nobody who's visible here owns it yet.")
 	}
 	var parts []discord.Component
-	if game.ImageURL != "" {
-		parts = append(parts, discord.Gallery(discord.MediaItem{Media: discord.Media{URL: game.ImageURL}}))
-	}
+	parts = append(parts, b.banner(game))
 	parts = append(parts,
 		discord.Text(fmt.Sprintf("## Who plays %s\n-# %d of %d linked %s %s it", game.Name,
 			owners, members, plural(members, "member", "members"), plural(owners, "owns", "own"))),
@@ -211,9 +210,7 @@ func (b *Bot) renderInCommon(ids []string, common []store.CommonGame, guildID st
 	}
 
 	var parts []discord.Component
-	if best.ImageURL != "" {
-		parts = append(parts, discord.Gallery(discord.MediaItem{Media: discord.Media{URL: best.ImageURL}}))
-	}
+	parts = append(parts, b.banner(best))
 	parts = append(parts,
 		discord.Text(fmt.Sprintf("## What can you play together?\n-# %s · %d %s everyone owns",
 			strings.Join(people, " "), len(common), plural(len(common), "game", "games"))),
@@ -288,8 +285,8 @@ func (b *Bot) chartMessage(ctx context.Context, guildID, command, footerNote str
 	var items []discord.MediaItem
 	for i, c := range entries {
 		lines = append(lines, fmt.Sprintf("%s **%s** · %s · %d %s", medal(i), c.Name, hours(c.Minutes), c.Players, plural(c.Players, "player", "players")))
-		if c.ImageURL != "" && len(items) < 3 {
-			items = append(items, discord.MediaItem{Media: discord.Media{URL: c.ImageURL}})
+		if len(items) < 3 {
+			items = append(items, discord.MediaItem{Media: discord.Media{URL: b.artURL(c.Game, render.ArtHeader)}})
 		}
 	}
 	foot := fmt.Sprintf("From %d linked %s", members, plural(members, "member", "members"))

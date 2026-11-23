@@ -62,6 +62,20 @@ func coverURL(appID string) string {
 	return "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/" + appID + "/library_600x900.jpg"
 }
 
+// artURL is a game's cover or header, served through this app so it also
+// works for newer Steam games, whose art lives under hashed paths.
+func (b *Bot) artURL(g store.Game, kind string) string {
+	if g.Platform != "" && g.Platform != steamPlatform {
+		return g.ImageURL
+	}
+	return render.ArtURL(b.Links.Site, b.LinkSecret, g.GameID, kind)
+}
+
+// banner is a one-image gallery of a game's wide header.
+func (b *Bot) banner(g store.Game) discord.Component {
+	return discord.Gallery(discord.MediaItem{Media: discord.Media{URL: b.artURL(g, render.ArtHeader)}})
+}
+
 // shelf is a gallery holding one drawn image of game covers with ranks and
 // hours: a 5x2 grid, or a single row. ok is false when there are no games.
 func (b *Bot) shelf(layout string, games []store.PlayedGame, recent bool) (discord.Component, bool) {

@@ -144,7 +144,7 @@ func (b *Bot) backlogCard(ctx context.Context, in *discord.Interaction, userID, 
 		}
 		meta = append(meta, status)
 		comps = append(comps, discord.Container(colorAccent,
-			discord.Section(discord.Thumbnail(coverURL(pick.GameID), ""),
+			discord.Section(discord.Thumbnail(b.artURL(pick.Game, render.ArtCover), ""),
 				"### 🎲 Tonight's pick\n**"+pick.Name+"**\n-# "+strings.Join(meta, " · ")),
 		))
 		row := []discord.Component{

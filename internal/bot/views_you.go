@@ -145,9 +145,7 @@ func (b *Bot) gameCard(ctx context.Context, in *discord.Interaction, game store.
 	}
 
 	var parts []discord.Component
-	if game.ImageURL != "" {
-		parts = append(parts, discord.Gallery(discord.MediaItem{Media: discord.Media{URL: game.ImageURL}}))
-	}
+	parts = append(parts, b.banner(game))
 	parts = append(parts, discord.Text(head), line(), discord.Text(strings.Join(facts, "\n")))
 
 	buttons := []discord.Component{

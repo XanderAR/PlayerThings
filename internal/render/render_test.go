@@ -8,8 +8,11 @@ import (
 	"image/jpeg"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
+	"sort"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -39,7 +42,8 @@ func TestEncodeDecodeAndSign(t *testing.T) {
 }
 
 // art serves a solid-color cover for app 1, only a wide header for app 2,
-// and nothing for app 3.
+// nothing for app 3, and app 4's cover only at a hashed path the store API
+// knows (like newer Steam games).
 func artServer(t *testing.T) *httptest.Server {
 	jpg := func(w, h int, c color.Color) []byte {
 		img := image.NewRGBA(image.Rect(0, 0, w, h))
@@ -53,12 +57,15 @@ func artServer(t *testing.T) *httptest.Server {
 		return buf.Bytes()
 	}
 	cover, header := jpg(600, 900, color.RGBA{200, 40, 40, 255}), jpg(460, 215, color.RGBA{40, 40, 200, 255})
+	hashed := jpg(600, 900, color.RGBA{40, 200, 40, 255})
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/cover/1":
 			w.Write(cover)
 		case "/header/2":
 			w.Write(header)
+		case "/abc123/library_capsule.jpg":
+			w.Write(hashed)
 		default:
 			http.NotFound(w, r)
 		}
@@ -72,8 +79,19 @@ func TestShelf(t *testing.T) {
 	r := New()
 	r.Cover = func(id string) string { return srv.URL + "/cover/" + id }
 	r.Fallback = func(id string) string { return srv.URL + "/header/" + id }
+	var mu sync.Mutex // tiles load in parallel
+	var lookups []string
+	r.Assets = func(_ context.Context, id string) (string, string, error) {
+		mu.Lock()
+		lookups = append(lookups, id)
+		mu.Unlock()
+		if id == "4" {
+			return srv.URL + "/abc123/library_capsule.jpg", "", nil
+		}
+		return "", "", nil
+	}
 
-	out, err := r.Shelf(context.Background(), Grid, []Tile{{"1", 24720}, {"2", 300}, {"3", 5}})
+	out, err := r.Shelf(context.Background(), Grid, []Tile{{"1", 24720}, {"2", 300}, {"3", 5}, {"4", 60}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,8 +99,8 @@ func TestShelf(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Three games fit one row, so the grid shrinks to one row of three.
-	if b := img.Bounds(); b.Dx() != gap+3*(tileW+gap) || b.Dy() != gap+tileH+captionH+gap {
+	// Four games fit one row, so the grid shrinks to one row of four.
+	if b := img.Bounds(); b.Dx() != gap+4*(tileW+gap) || b.Dy() != gap+tileH+captionH+gap {
 		t.Fatalf("size = %v", b)
 	}
 	// Middle of tile 1 is the red cover; tile 2 uses the blue header.
@@ -93,11 +111,21 @@ func TestShelf(t *testing.T) {
 	if _, _, b, _ := img.At(x2, gap+tileH/2).RGBA(); b>>8 < 150 {
 		t.Errorf("tile 2 isn't the header fallback (blue = %d)", b>>8)
 	}
+	// Tile 4's cover was found through the store lookup, which only ran for
+	// the apps the fixed URLs missed.
+	x4 := gap + 3*(tileW+gap) + tileW/2
+	if _, g, _, _ := img.At(x4, gap+tileH/2).RGBA(); g>>8 < 150 {
+		t.Errorf("tile 4 isn't the hashed cover (green = %d)", g>>8)
+	}
+	sort.Strings(lookups)
+	if strings.Join(lookups, ",") != "3,4" {
+		t.Errorf("store lookups = %v, want only 3 and 4", lookups)
+	}
 	if os.Getenv("SHELF_OUT") != "" {
 		os.WriteFile(os.Getenv("SHELF_OUT"), out, 0o644)
 	}
 	// Rendering again is served from the cache.
-	again, _ := r.Shelf(context.Background(), Grid, []Tile{{"1", 24720}, {"2", 300}, {"3", 5}})
+	again, _ := r.Shelf(context.Background(), Grid, []Tile{{"1", 24720}, {"2", 300}, {"3", 5}, {"4", 60}})
 	if !bytes.Equal(out, again) {
 		t.Fatal("second render differs")
 	}
@@ -128,5 +156,36 @@ func TestHoursLabel(t *testing.T) {
 		if got := hoursLabel(m); got != want {
 			t.Errorf("hoursLabel(%d) = %q, want %q", m, got, want)
 		}
+	}
+}
+
+// The art endpoint serves a game's header or cover, finding hashed art too.
+func TestArt(t *testing.T) {
+	srv := artServer(t)
+	r := New()
+	r.Cover = func(id string) string { return srv.URL + "/cover/" + id }
+	r.Fallback = func(id string) string { return srv.URL + "/header/" + id }
+	r.Assets = func(_ context.Context, id string) (string, string, error) {
+		if id == "4" {
+			return srv.URL + "/abc123/library_capsule.jpg", "", nil
+		}
+		return "", "", nil
+	}
+	for _, c := range []struct {
+		id, kind string
+		ok       bool
+	}{
+		{"2", ArtHeader, true}, {"1", ArtCover, true}, {"1", ArtHeader, false}, {"4", ArtHeader, true}, {"3", ArtCover, false},
+	} {
+		raw, typ, err := r.Art(context.Background(), c.id, c.kind)
+		if (err == nil) != c.ok || (c.ok && (typ != "image/jpeg" || len(raw) == 0)) {
+			t.Errorf("art %s %s: err=%v type=%s", c.id, c.kind, err, typ)
+		}
+	}
+	secret := []byte("0123456789abcdef0123456789abcdef")
+	u, _ := url.Parse(ArtURL("https://x", secret, "548430", ArtHeader))
+	q := u.Query()
+	if !VerifyArt(secret, q.Get("a"), q.Get("k"), q.Get("s")) || VerifyArt(secret, "730", q.Get("k"), q.Get("s")) || VerifyArt(secret, "548430", ArtCover, q.Get("s")) {
+		t.Fatal("art signatures don't bind the app and kind")
 	}
 }

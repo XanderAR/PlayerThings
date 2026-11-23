@@ -64,6 +64,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /privacy", s.privacy)
 	mux.HandleFunc("GET /terms", s.terms)
 	mux.HandleFunc("GET /render/shelf.jpg", s.shelf)
+	mux.HandleFunc("GET /render/art.jpg", s.art)
 	mux.HandleFunc("GET /icon.png", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "image/png")
 		w.Header().Set("Cache-Control", "public, max-age=86400")
@@ -97,6 +98,28 @@ func (s *Server) shelf(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "image/jpeg")
 	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	w.Write(img)
+}
+
+// art serves one game's cover or header. Steam keeps newer games' art under
+// hashed paths, so cards link here instead of guessing Steam URLs.
+func (s *Server) art(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	id, kind := q.Get("a"), q.Get("k")
+	if s.Render == nil || !render.VerifyArt(s.LinkSecret, id, kind, q.Get("s")) {
+		http.Error(w, "unknown image", http.StatusForbidden)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	raw, typ, err := s.Render.Art(ctx, id, kind)
+	if err != nil {
+		http.Error(w, "no art for this game", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", typ)
+	// Art can change when a game updates its store page, so not forever.
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Write(raw)
 }
 
 func (s *Server) callbackURL(token string) string {

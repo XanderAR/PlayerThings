@@ -18,7 +18,6 @@ import (
 	"image/color"
 	"image/jpeg"
 	_ "image/png" // some store art is PNG
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -145,10 +144,16 @@ type Renderer struct {
 	// then the wide store header if the cover is missing.
 	Cover    func(appID string) string
 	Fallback func(appID string) string
+	// Assets finds art the fixed URLs miss (newer apps keep it under hashed
+	// paths). Nil skips that step.
+	Assets func(ctx context.Context, appID string) (cover, header string, err error)
 
-	mu     sync.Mutex
-	art    map[string]image.Image // decoded art by URL
-	output map[string][]byte      // finished JPEGs by layout and tiles
+	mu      sync.Mutex
+	art     map[string]image.Image // decoded art by URL
+	output  map[string][]byte      // finished JPEGs by layout and tiles
+	raw     map[string][]byte      // art files for /render/art.jpg
+	assets  map[string]storeAssets // where the store says each app's art is
+	missing map[string]time.Time   // art URLs that failed recently
 
 	big, small font.Face
 	busy       chan struct{} // limits renders running at once
@@ -156,7 +161,7 @@ type Renderer struct {
 
 // New returns a Renderer that fetches art from Steam's CDN.
 func New() *Renderer {
-	return &Renderer{
+	r := &Renderer{
 		HTTP: &http.Client{Timeout: 8 * time.Second},
 		Cover: func(id string) string {
 			return "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/" + id + "/library_600x900.jpg"
@@ -165,6 +170,8 @@ func New() *Renderer {
 			return "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/" + id + "/header.jpg"
 		},
 	}
+	r.Assets = r.SteamAssets
+	return r
 }
 
 func (r *Renderer) init() error {
@@ -186,6 +193,9 @@ func (r *Renderer) init() error {
 	r.art = map[string]image.Image{}
 	r.output = map[string][]byte{}
 	r.busy = make(chan struct{}, maxRendering)
+	r.raw = map[string][]byte{}
+	r.assets = map[string]storeAssets{}
+	r.missing = map[string]time.Time{}
 	return nil
 }
 
@@ -280,11 +290,13 @@ func (r *Renderer) fetchAll(ctx context.Context, tiles []Tile) []image.Image {
 		wg.Add(1)
 		go func(i int, id string) {
 			defer wg.Done()
-			if img, err := r.fetch(ctx, r.Cover(id)); err == nil {
-				out[i] = img
-			} else if img, err := r.fetch(ctx, r.Fallback(id)); err == nil {
-				out[i] = img
-			}
+			r.artChain(ctx, id, ArtCover, func(u string) bool {
+				img, err := r.fetch(ctx, u)
+				if err == nil {
+					out[i] = img
+				}
+				return err == nil
+			})
 		}(i, t.AppID)
 	}
 	wg.Wait()
@@ -298,19 +310,7 @@ func (r *Renderer) fetch(ctx context.Context, url string) (image.Image, error) {
 		return img, nil
 	}
 	r.mu.Unlock()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := r.HTTP.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s: %s", url, resp.Status)
-	}
-	raw, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
+	raw, err := r.fetchRaw(ctx, url)
 	if err != nil {
 		return nil, err
 	}
