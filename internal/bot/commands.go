@@ -15,6 +15,9 @@ func Commands() []discord.Command {
 		return discord.CommandOption{Type: discord.OptionUser, Name: name, Description: "Someone to compare with", Required: required}
 	}
 	player := discord.CommandOption{Type: discord.OptionUser, Name: "player", Description: "Whose (leave empty for yours)"}
+	favorite := func(name string) discord.CommandOption {
+		return discord.CommandOption{Type: discord.OptionString, Name: name, Description: "Set your four: the " + name + " game", Autocomplete: true}
+	}
 
 	return []discord.Command{
 		{
@@ -60,6 +63,19 @@ func Commands() []discord.Command {
 			Options: []discord.CommandOption{
 				{Type: discord.OptionString, Name: "name", Description: "Which collection (leave empty to see them all)", Autocomplete: true},
 				player,
+			},
+			IntegrationTypes: anyInstall, Contexts: everywhere,
+		},
+		{
+			Name: "verdict", Description: "Let the court judge your gaming habits",
+			Options:          []discord.CommandOption{{Type: discord.OptionUser, Name: "player", Description: "Who's on trial (leave empty for you)"}},
+			IntegrationTypes: anyInstall, Contexts: everywhere,
+		},
+		{
+			Name: "four", Description: "Four favorites: the four games that made you. Show yours or pick them",
+			Options: []discord.CommandOption{
+				{Type: discord.OptionUser, Name: "player", Description: "Whose four (leave empty for yours)"},
+				favorite("first"), favorite("second"), favorite("third"), favorite("fourth"),
 			},
 			IntegrationTypes: anyInstall, Contexts: everywhere,
 		},

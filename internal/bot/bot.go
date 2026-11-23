@@ -134,6 +134,10 @@ func (b *Bot) command(ctx context.Context, in *discord.Interaction) discord.Resp
 		return b.cmdGOTY(ctx, in)
 	case "collection":
 		return b.cmdCollection(ctx, in)
+	case "verdict":
+		return b.cmdVerdict(ctx, in)
+	case "four":
+		return b.cmdFour(ctx, in)
 	}
 	return reply("I don't know that command yet.", true)
 }

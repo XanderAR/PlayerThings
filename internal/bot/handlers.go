@@ -206,6 +206,17 @@ func (b *Bot) profileCard(ctx context.Context, in *discord.Interaction, target d
 		discord.Text(fmt.Sprintf("**%s** played  ·  **%s** %s  ·  **%s** in the last 2 weeks",
 			hours(stats.Minutes), thousands(stats.Games), plural(stats.Games, "game", "games"), hours(stats.RecentMinutes))),
 	}
+	favs, err := b.Store.Favorites(ctx, target.ID, steamPlatform)
+	if err != nil {
+		return discord.ResponseData{}, err
+	}
+	if len(favs) > 0 {
+		var names []string
+		for _, g := range favs {
+			names = append(names, g.Name)
+		}
+		parts = append(parts, discord.Text("❤️ **Four favorites** · "+strings.Join(names, " · ")))
+	}
 	if len(top) > 0 {
 		parts = append(parts, gap(), discord.Text("### Most played\n"+rankLines(top, false)))
 	}
@@ -218,7 +229,7 @@ func (b *Bot) profileCard(ctx context.Context, in *discord.Interaction, target d
 	if acct.SyncedAt.IsZero() {
 		parts = append(parts, note("Your library is syncing. Check back in a minute."))
 	}
-	parts = append(parts, line(), note("More: `/iceberg` · `/collage` · `/taste`"))
+	parts = append(parts, line(), note("More: `/four` · `/verdict` · `/iceberg` · `/collage` · `/taste`"))
 
 	var buttons []discord.Component
 	if len(recent) > 0 {
@@ -355,6 +366,10 @@ func (b *Bot) component(ctx context.Context, in *discord.Interaction) discord.Re
 		return b.collectionComponent(ctx, in, parts)
 	case "mo":
 		return b.momentComponent(ctx, in, parts)
+	case "vd":
+		return b.verdictComponent(ctx, in, parts)
+	case "four":
+		return b.fourComponent(ctx, in, parts)
 	}
 	return reply("That button has expired. Run the command again.", true)
 }
@@ -375,6 +390,9 @@ func (b *Bot) autocomplete(ctx context.Context, in *discord.Interaction) discord
 				break
 			}
 		}
+	}
+	if ok && in.Data.Name == "four" {
+		choices = append(choices, b.favoriteChoices(ctx, in, focused.StringValue())...)
 	}
 	if ok && focused.Name == "game" {
 		query := focused.StringValue()

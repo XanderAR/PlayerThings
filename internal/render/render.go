@@ -38,16 +38,18 @@ type Tile struct {
 	Minutes int
 }
 
-// Layouts: a 5x2 grid for /collage, a single row for profile cards, and a
-// collection board (5x2, no ranks, unplayed games dimmed).
+// Layouts: a 5x2 grid for /collage, a single row for profile cards, a
+// collection board (5x2, no ranks, unplayed games dimmed) and four favorites
+// (one row of four, a heart instead of a rank).
 const (
 	Grid  = "grid"
 	Strip = "strip"
 	Set   = "set"
+	Four  = "four"
 )
 
 // ValidLayout reports whether l is a layout Shelf can draw.
-func ValidLayout(l string) bool { return l == Grid || l == Strip || l == Set }
+func ValidLayout(l string) bool { return l == Grid || l == Strip || l == Set || l == Four }
 
 const (
 	tileW, tileH = 240, 360 // Steam library covers are 2:3
@@ -57,8 +59,11 @@ const (
 )
 
 func size(layout string) (cols, rows int) {
-	if layout == Strip {
+	switch layout {
+	case Strip:
 		return 5, 1
+	case Four:
+		return 4, 1
 	}
 	return 5, 2
 }
@@ -234,6 +239,8 @@ func (r *Renderer) Shelf(ctx context.Context, layout string, tiles []Tile) ([]by
 				draw.Draw(canvas, cell, &image.Uniform{color.NRGBA{0x12, 0x13, 0x15, 185}}, image.Point{}, draw.Over)
 			}
 			r.setCaption(canvas, strip, tiles[i].Minutes)
+		} else if layout == Four {
+			r.fourCaption(canvas, strip, tiles[i].Minutes)
 		} else {
 			r.caption(canvas, strip, i, tiles[i].Minutes)
 		}
@@ -362,6 +369,34 @@ func (r *Renderer) setCaption(dst *image.RGBA, strip image.Rectangle, minutes in
 	}
 	circle(dst, strip.Min.X+22, cy, 8, color.RGBA{0x23, 0xa5, 0x5a, 0xff})
 	text(dst, r.big, hoursLabel(minutes), strip.Min.X+40, cy+10, color.White)
+}
+
+// fourCaption marks a favorite with a heart and the hours played on Steam.
+func (r *Renderer) fourCaption(dst *image.RGBA, strip image.Rectangle, minutes int) {
+	draw.Draw(dst, strip, &image.Uniform{captionBG}, image.Point{}, draw.Src)
+	cy := strip.Min.Y + strip.Dy()/2
+	heart(dst, strip.Min.X+24, cy, 11, color.RGBA{0xff, 0x5a, 0x7a, 0xff})
+	if minutes == 0 {
+		text(dst, r.small, "no Steam hours", strip.Min.X+44, cy+7, color.RGBA{0x8a, 0x8e, 0x96, 0xff})
+		return
+	}
+	text(dst, r.big, hoursLabel(minutes), strip.Min.X+44, cy+10, color.White)
+}
+
+// heart fills a heart shape of half-width size centred on cx, cy, using the
+// curve (x^2 + y^2 - 1)^3 - x^2 y^3 <= 0.
+func heart(dst *image.RGBA, cx, cy, size int, c color.Color) {
+	s := float64(size)
+	for py := -size - 2; py <= size+2; py++ {
+		for px := -size - 2; px <= size+2; px++ {
+			x := float64(px) / s * 1.15
+			y := -float64(py) / s * 1.15
+			a := x*x + y*y - 1
+			if a*a*a-x*x*y*y*y <= 0 {
+				dst.Set(cx+px, cy+py, c)
+			}
+		}
+	}
 }
 
 func circle(dst *image.RGBA, cx, cy, rad int, c color.Color) {

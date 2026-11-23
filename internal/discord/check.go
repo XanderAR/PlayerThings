@@ -181,6 +181,9 @@ func (c *checker) selectMenu(s Component) error {
 			return fmt.Errorf("select option %q is out of bounds", o.Label)
 		}
 	}
+	if s.MaxValues > len(s.Options) || (s.MinValues != nil && (*s.MinValues > len(s.Options) || (s.MaxValues > 0 && *s.MinValues > s.MaxValues))) {
+		return fmt.Errorf("select allows %d values but has %d options", s.MaxValues, len(s.Options))
+	}
 	return c.customID(s.CustomID)
 }
 

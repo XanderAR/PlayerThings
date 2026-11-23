@@ -325,6 +325,8 @@ type Component struct {
 	AccentColor *int           `json:"accent_color,omitempty"` // container
 	Options     []SelectOption `json:"options,omitempty"`      // string select
 	Placeholder string         `json:"placeholder,omitempty"`  // string select
+	MinValues   *int           `json:"min_values,omitempty"`   // string select
+	MaxValues   int            `json:"max_values,omitempty"`   // string select
 }
 
 // Media points at an image by URL.
@@ -343,6 +345,7 @@ type SelectOption struct {
 	Label       string `json:"label"`
 	Value       string `json:"value"`
 	Description string `json:"description,omitempty"`
+	Default     bool   `json:"default,omitempty"` // pre-selected
 }
 
 // ActionRow groups up to five buttons, or one select menu.

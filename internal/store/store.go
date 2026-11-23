@@ -174,7 +174,7 @@ func Open(path string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, s := range []string{schema, feedSchema, momentSchema} {
+	for _, s := range []string{schema, feedSchema, momentSchema, favoriteSchema} {
 		if _, err := db.Exec(s); err != nil {
 			db.Close()
 			return nil, fmt.Errorf("create schema: %w", err)
@@ -635,6 +635,7 @@ func (s *Store) DeleteUser(ctx context.Context, discordID string) error {
 			`DELETE FROM accounts WHERE discord_id = ?`,
 			`DELETE FROM guild_visibility WHERE discord_id = ?`,
 			`DELETE FROM moment_votes WHERE discord_id = ?`,
+			`DELETE FROM favorites WHERE discord_id = ?`,
 		} {
 			if _, err := tx.ExecContext(ctx, q, discordID); err != nil {
 				return err
@@ -649,7 +650,8 @@ func (s *Store) HasData(ctx context.Context, discordID string) (bool, error) {
 	var n int
 	err := s.db.QueryRowContext(ctx, `
 		SELECT (SELECT COUNT(*) FROM accounts WHERE discord_id = ?) +
-		       (SELECT COUNT(*) FROM guild_visibility WHERE discord_id = ?)`, discordID, discordID).Scan(&n)
+		       (SELECT COUNT(*) FROM guild_visibility WHERE discord_id = ?) +
+		       (SELECT COUNT(*) FROM favorites WHERE discord_id = ?)`, discordID, discordID, discordID).Scan(&n)
 	return n > 0, err
 }
 
