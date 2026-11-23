@@ -125,7 +125,7 @@ func TestFourFavorites(t *testing.T) {
 	d = valid(t, messageData(t, r))
 	text := texts(d)
 	if !strings.Contains(text, "Balatro · Deep Rock Galactic") ||
-		!strings.Contains(text, "▸ **Deep Rock Galactic** is also a favorite of 1 person here") ||
+		!strings.Contains(text, "▸ **Deep Rock Galactic** · <@100>") ||
 		!strings.Contains(text, "Closest match: <@100>, sharing 1 of 2") {
 		t.Fatalf("typed four = %s", text)
 	}

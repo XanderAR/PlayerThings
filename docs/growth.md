@@ -53,8 +53,8 @@ Calendar for the next six months (dates are verified unless marked):
 ## Next gimmicks, ranked by likely spread per hour of work
 
 1. **Gaming age** (XS). "Your gaming age is 2011": the release year of your games, weighted by hours. One provocative number, the Spotify Listening Age format. The data is already stored.
-2. **`/four` Four Favorites** (S). Letterboxd's most-copied format. Pick four games and the card shows them as a cover strip on your profile; `/taste` can weigh them; "post your four" threads. The renderer already draws it.
-3. **`/verdict`** (S). An fmbot `.judge`-style roast: an archetype ("The Factory Foreman") plus three lines pulled from real stats ("62% of your playtime is Factorio. The factory must grow."). No AI needed.
+2. **Built: `/four` Four Favorites** (S). Letterboxd's most-copied format. Pick four games and the card shows them as a cover strip on your profile; `/taste` can weigh them; "post your four" threads. The renderer already draws it.
+3. **Built: `/verdict`** (S). An fmbot `.judge`-style roast: an archetype ("The Factory Foreman") plus three lines pulled from real stats ("62% of your playtime is Factorio. The factory must grow."). No AI needed.
 4. **`/backlog` pile of shame** (S). The share of your library you've never launched, plus a "🎲 Pick one for me" button that rerolls.
 5. **`/receipt`** (S-M). The Receiptify parody: your top 10 games as line items, hours as prices, with "CASHIER: player.gg" at the bottom. It needs a new image template.
 6. **Daily guess-the-game** (M). A zoomed crop of a cover with four buttons, server streaks, and yesterday's summary posted to the radar channel. This is the Wordle Activity loop.

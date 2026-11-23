@@ -117,6 +117,11 @@ func Preview(ctx context.Context, dir string, files PreviewFiles, siteURL, youID
 	run("/goty scope:server", command("goty", opt("scope", "server")))
 	run("/collection", command("collection"))
 	run("/collection Indie hall of fame", command("collection", opt("name", "indie-hall-of-fame")))
+	run("/four (first time: picker)", command("four"))
+	run("/four → after picking", clickOn("four:set", "548430", "427520", "646570", "1092790"))
+	run("/four", command("four"))
+	run("/verdict", command("verdict"))
+	run("/verdict → Appeal", clickOn("vd:a:"+youID))
 	if ms, err := b.moments(); err == nil && len(ms) > 0 {
 		if data, err := b.momentCard(ctx, ms[0], guild); err == nil {
 			cards = append(cards, PreviewCard{"Moment post", data})
@@ -215,6 +220,12 @@ func seedPreview(ctx context.Context, st *store.Store, guild, youID string, now 
 		if err := st.SetVisibility(ctx, guild, lib.id, true, now); err != nil {
 			return err
 		}
+	}
+	if err := st.SetFavorites(ctx, previewMara, steamPlatform, []string{"427520", "230410", "548430", "2379780"}, now); err != nil {
+		return err
+	}
+	if err := st.SetFavorites(ctx, previewTheo, steamPlatform, []string{"413150", "646570", "2379780", "1085660"}, now); err != nil {
+		return err
 	}
 	for _, g := range previewGames {
 		mp := g.mp

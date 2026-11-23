@@ -516,11 +516,10 @@ func (b *Bot) verdictCard(name, avatar, subjectID, guildID string, ev evidence, 
 	accent := colorVerdict
 	if defense {
 		accent = colorLive
-		outcome := pick(subjectID+b.now().Format("2006-01-02"),
-			"Appeal granted.", "Appeal partly granted.", "Appeal denied, but noted.")
 		title = "🧑‍⚖️ " + name + " appeals"
-		sub = outcome + " " + evidenceLine
-		rulingText = "### " + r.arch.emoji + " " + r.arch.title + ", with honors\n-# The case for the defense"
+		sub = pick(subjectID+b.now().Format("2006-01-02"),
+			"Appeal granted. In your defense:", "Appeal partly granted. In your defense:", "Appeal denied. Still, in your defense:")
+		rulingText = "### " + r.arch.emoji + " " + r.arch.title + ", with honors"
 	} else {
 		title = "⚖️ The verdict on " + name
 		sub = evidenceLine

@@ -181,24 +181,31 @@ func (b *Bot) fourCard(ctx context.Context, in *discord.Interaction, target disc
 // sharedFavorites says which favorites other members here share, and who
 // shares the most.
 func sharedFavorites(favs []store.PlayedGame, matches map[string][]string) string {
-	counts := map[string]int{}
 	var who []string
-	for id, games := range matches {
+	for id := range matches {
 		who = append(who, id)
-		for _, g := range games {
-			counts[g]++
-		}
 	}
+	// Closest matches first, so they're named first on each game too.
 	sort.Slice(who, func(i, j int) bool {
 		if len(matches[who[i]]) != len(matches[who[j]]) {
 			return len(matches[who[i]]) > len(matches[who[j]])
 		}
 		return who[i] < who[j]
 	})
-	lines := []string{"### Shared here"}
+	fans := map[string][]string{}
+	for _, id := range who {
+		for _, g := range matches[id] {
+			fans[g] = append(fans[g], mention(id))
+		}
+	}
+	lines := []string{"### Also in their four here"}
 	for _, g := range favs {
-		if n := counts[g.GameID]; n > 0 {
-			lines = append(lines, fmt.Sprintf("▸ **%s** is also a favorite of %d %s here", g.Name, n, plural(n, "person", "people")))
+		if names := fans[g.GameID]; len(names) > 0 {
+			l := "▸ **" + g.Name + "** · " + strings.Join(names[:min(3, len(names))], ", ")
+			if len(names) > 3 {
+				l += fmt.Sprintf(" +%d", len(names)-3)
+			}
+			lines = append(lines, l)
 		}
 	}
 	best := who[0]
