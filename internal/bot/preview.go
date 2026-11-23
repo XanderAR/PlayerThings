@@ -21,6 +21,12 @@ const (
 	previewTheo = "100000000000000002"
 )
 
+// PreviewPlayers names the preview's players by Discord ID, so a demo can show
+// names where Discord can't resolve the sample IDs' mentions.
+func PreviewPlayers(youID string) map[string]string {
+	return map[string]string{youID: "Alex", previewMara: "Mara", previewTheo: "Theo"}
+}
+
 // PreviewCard is one rendered reply, for checking layouts in Discord.
 type PreviewCard struct {
 	Name string

@@ -51,8 +51,10 @@ func main() {
 		stats(cfg)
 	case "preview":
 		preview(cfg, os.Args[2:])
+	case "demo":
+		demo(cfg, os.Args[2:])
 	default:
-		fmt.Fprintln(os.Stderr, "usage: playradar [serve | register [-guild ID] | stats | preview [-channel ID] [-you USER_ID]]")
+		fmt.Fprintln(os.Stderr, "usage: playradar [serve | register [-guild ID] | stats | preview [-channel ID] [-you USER_ID] | demo -channel ID [-you USER_ID]]")
 		os.Exit(2)
 	}
 }

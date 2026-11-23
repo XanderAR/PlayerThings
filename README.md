@@ -28,7 +28,7 @@ This is an unofficial proof of concept built for player.gg. It uses only public 
 | `/visibility show/hide` | Show or hide yourself in one server |
 | `/unlink` | Deletes everything stored about you |
 
-Replies use Discord's Components V2 layout (cards, sections, galleries). `go run ./cmd/playradar preview` renders every card from sample data and checks it against Discord's component limits; add `-channel ID` to post them in a channel so Discord validates them too.
+Replies use Discord's Components V2 layout (cards, sections, galleries). `go run ./cmd/playradar preview` renders every card from sample data and checks it against Discord's component limits; add `-channel ID` to post them in a channel so Discord validates them too. `go run ./cmd/playradar demo -channel ID -you YOUR_USER_ID` posts a walkthrough of every command for demos: a heading and a line on what each one does, then its card (set `LINK_SECRET` and `BASE_URL` to the live service's so images load).
 
 Every game button opens the game's page on player.gg. `https://player.gg/explore/games/<steam app id>.steam` resolves to player.gg's own page for that game. All player.gg links pass through `/go`, which counts the click and adds `utm_source=discord&utm_medium=app`.
 
