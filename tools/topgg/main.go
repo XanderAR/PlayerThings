@@ -54,14 +54,24 @@ func main() {
 	bannerName := flag.String("banner", "banner.png", "banner file name")
 	footer := flag.String("footer", "Steam stats, playtests and server leaderboards  ·  Unofficial, built for player.gg", "banner footer line")
 	bannerOnly := flag.Bool("banner-only", false, "only draw the banner")
+	avatars := flag.String("avatars", "alex=alex-5,mara,theo", "placeholder avatars to write: name or name=seed")
+	cardAvatar := flag.String("card-avatar", "alex-5", "seed of the avatar swapped into card screenshots")
 	list := shots{}
 	flag.Var(list, "shot", "card screenshot: name=path[@offset][,path@offset...] (repeatable)")
 	flag.Parse()
 	if err := os.MkdirAll(*out, 0o755); err != nil {
 		log.Fatal(err)
 	}
+	// Placeholder profile pictures for the sample players.
+	for _, spec := range strings.Split(*avatars, ",") {
+		name, seed, ok := strings.Cut(spec, "=")
+		if !ok {
+			seed = name
+		}
+		save(filepath.Join(*out, "avatar-"+name+".png"), avatar(seed, 256))
+	}
 	for name, spec := range list {
-		img, err := card(spec)
+		img, err := card(spec, avatar(*cardAvatar, 256))
 		if err != nil {
 			log.Fatalf("%s: %v", name, err)
 		}
@@ -80,7 +90,7 @@ func main() {
 // card loads a card's screenshot slices, stitches them by row offset, trims
 // the label above the card and the empty chat around it, and rounds the
 // corners.
-func card(spec string) (image.Image, error) {
+func card(spec string, av image.Image) (image.Image, error) {
 	type slice struct {
 		img image.Image
 		off int
@@ -107,6 +117,7 @@ func card(spec string) (image.Image, error) {
 	for _, s := range parts {
 		draw.Draw(full, image.Rect(0, s.off, width, s.off+s.img.Bounds().Dy()), s.img, s.img.Bounds().Min, draw.Src)
 	}
+	swapAvatar(full, av)
 
 	bg := full.At(width-3, 3) // empty chat to the right of the label
 	differs := func(c color.Color, by int) bool {
@@ -365,3 +376,71 @@ func abs(n int) int {
 }
 
 var _ = jpeg.Decode // registers JPEG decoding for screenshots and covers
+
+// ----- placeholder avatars -----
+
+// avatar draws a pixel-art placeholder profile picture: a mirrored 5x5
+// pattern (like a default identicon) in a color picked from the name.
+func avatar(name string, size int) *image.RGBA {
+	palette := []struct{ fg, bg color.RGBA }{
+		{color.RGBA{0x7c, 0x5c, 0xff, 0xff}, color.RGBA{0xe9, 0xe3, 0xff, 0xff}},
+		{color.RGBA{0x10, 0xb9, 0x81, 0xff}, color.RGBA{0xdc, 0xf7, 0xec, 0xff}},
+		{color.RGBA{0xf5, 0x6b, 0x3c, 0xff}, color.RGBA{0xff, 0xe6, 0xdb, 0xff}},
+		{color.RGBA{0x0e, 0xa5, 0xe9, 0xff}, color.RGBA{0xdb, 0xf1, 0xfd, 0xff}},
+	}
+	h := uint32(2166136261)
+	for _, c := range []byte(name) {
+		h = (h ^ uint32(c)) * 16777619
+	}
+	pal := palette[h%uint32(len(palette))]
+	img := image.NewRGBA(image.Rect(0, 0, size, size))
+	draw.Draw(img, img.Bounds(), image.NewUniform(pal.bg), image.Point{}, draw.Src)
+	cell := size / 7 // a one-cell margin around the 5x5 pattern
+	off := (size - 5*cell) / 2
+	bits := h >> 3
+	for y := 0; y < 5; y++ {
+		for x := 0; x < 3; x++ {
+			on := bits&1 == 1
+			bits = bits>>1 | (bits&1)<<31
+			if y == 2 && x == 2 {
+				on = true // keep the middle solid so no pattern looks empty
+			}
+			if !on {
+				continue
+			}
+			for _, cx := range []int{x, 4 - x} {
+				r := image.Rect(off+cx*cell, off+y*cell, off+(cx+1)*cell, off+(y+1)*cell)
+				draw.Draw(img, r, image.NewUniform(pal.fg), image.Point{}, draw.Src)
+			}
+		}
+	}
+	return img
+}
+
+// swapAvatar replaces the Discord default avatar (a blurple square with the
+// Discord logo) in the top right of a card screenshot with a placeholder.
+func swapAvatar(img *image.RGBA, av image.Image) {
+	b := img.Bounds()
+	minX, minY, maxX, maxY := b.Max.X, b.Max.Y, -1, -1
+	for y := b.Min.Y; y < min(b.Max.Y, b.Min.Y+260); y++ {
+		for x := b.Min.X + b.Dx()*55/100; x < b.Max.X; x++ {
+			r, g, bl, _ := img.At(x, y).RGBA()
+			if abs(int(r>>8)-0x58) < 14 && abs(int(g>>8)-0x65) < 14 && abs(int(bl>>8)-0xf2) < 14 {
+				minX, minY = min(minX, x), min(minY, y)
+				maxX, maxY = max(maxX, x), max(maxY, y)
+			}
+		}
+	}
+	w, h := maxX-minX+1, maxY-minY+1
+	if maxX < 0 || w < 40 || h < 40 || abs(w-h) > 6 {
+		return // no thumbnail on this card
+	}
+	rect := image.Rect(minX, minY, maxX+1, maxY+1)
+	bg := img.At(minX-4, minY+h/2) // the card behind the thumbnail
+	// Cover the old square's anti-aliased edge too.
+	draw.Draw(img, rect.Inset(-2), image.NewUniform(bg), image.Point{}, draw.Src)
+	tile := image.NewRGBA(image.Rect(0, 0, w, h))
+	draw.NearestNeighbor.Scale(tile, tile.Bounds(), av, av.Bounds(), draw.Src, nil)
+	roundCorners(tile, 8)
+	draw.Draw(img, rect, tile, image.Point{}, draw.Over)
+}

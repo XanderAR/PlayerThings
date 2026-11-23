@@ -47,7 +47,7 @@ func Preview(ctx context.Context, dir string, files PreviewFiles, siteURL, youID
 	defer st.Close()
 	const guild = "preview-guild"
 	now := time.Now()
-	if err := seedPreview(ctx, st, guild, youID, now); err != nil {
+	if err := seedPreview(ctx, st, guild, youID, siteURL, now); err != nil {
 		return nil, err
 	}
 	capture := &captureDiscord{}
@@ -187,7 +187,7 @@ var previewGames = []previewGame{
 }
 
 // seedPreview links you and two sample friends, all visible in the guild.
-func seedPreview(ctx context.Context, st *store.Store, guild, youID string, now time.Time) error {
+func seedPreview(ctx context.Context, st *store.Store, guild, youID, siteURL string, now time.Time) error {
 	type play struct {
 		id            string
 		hours, recent float64
@@ -218,7 +218,8 @@ func seedPreview(ctx context.Context, st *store.Store, guild, youID string, now 
 			games = append(games, store.Game{GameID: p.id, Name: names[p.id], ImageURL: steam.HeaderImage(p.id), StoreURL: steam.StoreURL(p.id)})
 			entries = append(entries, store.LibraryEntry{GameID: p.id, MinutesTotal: int(p.hours * 60), MinutesRecent: int(p.recent * 60)})
 		}
-		profile := store.Profile{DisplayName: lib.name, AvatarURL: "https://cdn.discordapp.com/embed/avatars/0.png"}
+		// Placeholder pictures served by the app (built by tools/topgg).
+		profile := store.Profile{DisplayName: lib.name, AvatarURL: siteURL + "/media/avatar-" + strings.ToLower(lib.name) + ".png"}
 		if err := st.SaveSync(ctx, lib.id, steamPlatform, profile, games, entries, now); err != nil {
 			return err
 		}

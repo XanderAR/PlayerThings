@@ -139,11 +139,11 @@ type beat struct {
 }
 
 var beats = []beat{
-	{5.0, 8.6, func(a assets) image.Image { return a.verdict }, "/verdict", "Get judged by your own playtime."},
+	{5.0, 8.6, func(a assets) image.Image { return a.verdict }, "/verdict", "Get roasted by your own Steam stats."},
 	{8.4, 12.0, func(a assets) image.Image { return a.four }, "/four", "Show off the four games that made you."},
 	{11.8, 15.4, nil, "/profile", "Your whole Steam library in one card."},
-	{15.2, 18.8, func(a assets) image.Image { return a.backlog }, "/backlog", "Face your pile of shame."},
-	{18.6, 22.2, func(a assets) image.Image { return a.goty }, "/goty", "Run your Game of the Year race."},
+	{15.2, 18.8, func(a assets) image.Image { return a.backlog }, "/backlog", "See the games you bought and never played."},
+	{18.6, 22.2, func(a assets) image.Image { return a.goty }, "/goty", "Your Game of the Year, ranked by your hours."},
 	{22.0, 25.6, func(a assets) image.Image { return a.playtests }, "/playtests", "Play new games before they're out."},
 }
 
@@ -192,7 +192,7 @@ func presence(local, dur, in, out float64) float64 {
 
 func (r *renderer) hook(dst *image.RGBA, t float64) {
 	alpha := presence(t, 2.9, 0.3, 0.35)
-	line1, line2 := "Who here actually plays", "Elden Ring?"
+	line1, line2 := "What does your Steam library", "say about you?"
 	full := line1 + "\n" + line2
 	shown := int(clamp((t-0.25)/1.4) * float64(len([]rune(full))))
 	typed := string([]rune(full)[:shown])
