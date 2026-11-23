@@ -306,6 +306,25 @@ func TestProfile(t *testing.T) {
 	}
 }
 
+// A library whose first sync failed shows a "not loaded" note, not zeros,
+// and asking again kicks off a retry.
+func TestProfileBeforeFirstSuccessfulSync(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.st.LinkAccount(ctx, store.Account{DiscordID: "500", Platform: "steam", ExternalID: "76561198000000500", LinkedAt: now.Add(-time.Hour)})
+	h.st.MarkSyncError(ctx, "500", "steam", "STEAM_API_KEY is not set", now.Add(-time.Hour))
+
+	r, _ := h.send(t, cmd("profile", "", "500", ""))
+	d := messageData(t, r)
+	e := d.Embeds[0]
+	if len(e.Fields) != 0 || !strings.Contains(e.Description, "hasn't loaded yet") || d.Flags&discord.FlagEphemeral == 0 {
+		t.Fatalf("profile = %+v", d)
+	}
+	if len(h.sy.soon) != 1 {
+		t.Fatalf("expected a retry, got %d syncs", len(h.sy.soon))
+	}
+}
+
 func TestInCommonIsDeferredAndFindsMultiplayer(t *testing.T) {
 	h := newHarness(t)
 	r, _ := h.send(t, cmd("incommon", "G", "100", "0", opt("friend", 6, "200")))

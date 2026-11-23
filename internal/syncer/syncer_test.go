@@ -74,9 +74,40 @@ func TestSteamSyncAndMultiplayerWarmup(t *testing.T) {
 	}
 
 	// Just synced, so the next tick leaves it alone.
-	due, _ := st.DueForSync(ctx, "steam", now.Add(-s.Interval), 10)
+	due, _ := st.DueForSync(ctx, "steam", now.Add(-s.Interval), now.Add(-retryFailedAfter), 10)
 	if len(due) != 0 {
 		t.Fatalf("due right after sync = %d", len(due))
+	}
+}
+
+// A failed sync is retried after retryFailedAfter, not after the full interval.
+func TestFailedSyncRetriesSoon(t *testing.T) {
+	st, _ := store.Open(filepath.Join(t.TempDir(), "sync.db"))
+	defer st.Close()
+	ctx := context.Background()
+	now := time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC)
+	st.LinkAccount(ctx, store.Account{DiscordID: "100", Platform: "steam", ExternalID: "76561198000000001", LinkedAt: now})
+
+	s := &Syncer{
+		Store:     st,
+		Providers: map[string]Provider{"steam": SteamProvider{Client: steam.New("", 0)}}, // no key: every sync fails
+		Interval:  12 * time.Hour,
+		Now:       func() time.Time { return now },
+	}
+	s.tick(ctx)
+	if acct, _, _ := st.Account(ctx, "100", "steam"); acct.SyncError == "" {
+		t.Fatalf("expected a sync error, got %+v", acct)
+	}
+
+	due := func(at time.Time) int {
+		d, _ := st.DueForSync(ctx, "steam", at.Add(-s.Interval), at.Add(-retryFailedAfter), 10)
+		return len(d)
+	}
+	if n := due(now.Add(time.Minute)); n != 0 {
+		t.Fatalf("due a minute after failing = %d", n)
+	}
+	if n := due(now.Add(retryFailedAfter + time.Second)); n != 1 {
+		t.Fatalf("due after the retry delay = %d", n)
 	}
 }
 

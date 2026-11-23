@@ -216,13 +216,15 @@ func (s *Store) Account(ctx context.Context, discordID, platform string) (Accoun
 	return a, err == nil, err
 }
 
-// DueForSync returns accounts last synced before cutoff, oldest first.
-func (s *Store) DueForSync(ctx context.Context, platform string, cutoff time.Time, limit int) ([]Account, error) {
+// DueForSync returns accounts last synced before cutoff, plus accounts whose
+// last sync failed before retryCutoff, oldest first.
+func (s *Store) DueForSync(ctx context.Context, platform string, cutoff, retryCutoff time.Time, limit int) ([]Account, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT discord_id, platform, external_id, display_name, avatar_url, profile_url,
 		       library_private, linked_at, synced_at, sync_error
-		FROM accounts WHERE platform = ? AND synced_at < ?
-		ORDER BY synced_at LIMIT ?`, platform, cutoff.Unix(), limit)
+		FROM accounts
+		WHERE platform = ? AND (synced_at < ? OR (sync_error != '' AND synced_at < ?))
+		ORDER BY synced_at LIMIT ?`, platform, cutoff.Unix(), retryCutoff.Unix(), limit)
 	if err != nil {
 		return nil, err
 	}

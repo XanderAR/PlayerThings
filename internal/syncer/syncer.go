@@ -102,6 +102,10 @@ func (s *Syncer) CheckGame(ctx context.Context, appID string) (*bool, error) {
 	return v, s.Store.SetMultiplayer(ctx, "steam", appID, v, s.now())
 }
 
+// retryFailedAfter is how long a failed sync waits before it's tried again,
+// instead of waiting the full sync interval.
+const retryFailedAfter = 10 * time.Minute
+
 // Run syncs stale accounts and fills in multiplayer tags until ctx ends.
 func (s *Syncer) Run(ctx context.Context) {
 	t := time.NewTicker(time.Minute)
@@ -118,8 +122,9 @@ func (s *Syncer) Run(ctx context.Context) {
 
 func (s *Syncer) tick(ctx context.Context) {
 	cutoff := s.now().Add(-s.Interval)
+	retryCutoff := s.now().Add(-retryFailedAfter)
 	for platform := range s.Providers {
-		due, err := s.Store.DueForSync(ctx, platform, cutoff, 30)
+		due, err := s.Store.DueForSync(ctx, platform, cutoff, retryCutoff, 30)
 		if err != nil {
 			s.log().Error("list accounts to sync", "err", err)
 			continue

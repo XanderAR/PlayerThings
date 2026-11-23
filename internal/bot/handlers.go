@@ -101,7 +101,8 @@ func (b *Bot) cmdProfile(ctx context.Context, in *discord.Interaction) discord.R
 	if self {
 		stale := b.now().Sub(acct.SyncedAt) > 6*time.Hour
 		retryPrivate := acct.LibraryPrivate && b.now().Sub(acct.SyncedAt) > 10*time.Minute
-		if stale || retryPrivate {
+		retryFailed := acct.SyncError != "" && b.now().Sub(acct.SyncedAt) > time.Minute
+		if stale || retryPrivate || retryFailed {
 			b.Syncer.SyncSoon(target.ID, steamPlatform)
 		}
 	}
@@ -125,6 +126,15 @@ func (b *Bot) cmdProfile(ctx context.Context, in *discord.Interaction) discord.R
 		stats, err := b.Store.LibraryStats(ctx, target.ID, steamPlatform)
 		if err != nil {
 			return b.oops(err, "library stats")
+		}
+		if stats.Games == 0 && (acct.SyncError != "" || acct.SyncedAt.IsZero()) {
+			// Never loaded: say so instead of showing a card full of zeros.
+			e.Description = "Their Steam library hasn't loaded yet."
+			if self {
+				e.Description = "Your Steam library hasn't loaded yet. It's loading now, so run `/profile` again in a minute."
+			}
+			e.Footer = &discord.EmbedFooter{Text: "Steam library not loaded yet"}
+			return message(discord.ResponseData{Embeds: []discord.Embed{e}, Flags: discord.FlagEphemeral})
 		}
 		top, err := b.Store.TopGames(ctx, target.ID, steamPlatform, false, 5)
 		if err != nil {
