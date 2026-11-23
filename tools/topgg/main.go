@@ -51,6 +51,9 @@ func (s shots) Set(v string) error {
 func main() {
 	out := flag.String("out", "internal/web/static/media", "output folder")
 	icon := flag.String("icon", "internal/web/static/icon.png", "app icon for the banner")
+	bannerName := flag.String("banner", "banner.png", "banner file name")
+	footer := flag.String("footer", "Steam stats, playtests and server leaderboards  ·  Unofficial, built for player.gg", "banner footer line")
+	bannerOnly := flag.Bool("banner-only", false, "only draw the banner")
 	list := shots{}
 	flag.Var(list, "shot", "card screenshot: name=path[@offset][,path@offset...] (repeatable)")
 	flag.Parse()
@@ -64,8 +67,10 @@ func main() {
 		}
 		save(filepath.Join(*out, "card-"+name+".png"), img)
 	}
-	shelves(*out)
-	if err := banner(filepath.Join(*out, "banner.png"), *icon); err != nil {
+	if !*bannerOnly {
+		shelves(*out)
+	}
+	if err := banner(filepath.Join(*out, *bannerName), *icon, *footer); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -197,7 +202,7 @@ func shelves(out string) {
 
 // ----- banner -----
 
-func banner(path, iconPath string) error {
+func banner(path, iconPath, footer string) error {
 	const W, H = 1600, 600
 	img := image.NewRGBA(image.Rect(0, 0, W, H))
 	// Deep purple gradient with a soft glow behind the covers.
@@ -271,7 +276,7 @@ func banner(path, iconPath string) error {
 		text(img, chipFace, chip, x+18, 435, color.RGBA{0xee, 0xea, 0xff, 0xff})
 		x += w + 12
 	}
-	text(img, small, "Steam stats, playtests and server leaderboards  ·  Unofficial, built for player.gg", 92, 532, color.RGBA{0x9a, 0x93, 0xbd, 0xff})
+	text(img, small, footer, 92, 532, color.RGBA{0x9a, 0x93, 0xbd, 0xff})
 
 	f, err := os.Create(path)
 	if err != nil {

@@ -1,7 +1,13 @@
-# top.gg listing
+# top.gg listing: draft for the player.gg team
 
-Everything to paste into top.gg's "Add a bot" form. Images are served by the
-app at `/media/` (built with `go run ./tools/topgg`, see that file for how).
+This is how the bot's top.gg page would read as the official player.gg app.
+It's a proposal to show the player.gg team, **not submitted to top.gg**. The
+live bot still describes itself as an unofficial proof of concept until
+player.gg signs off.
+
+Open this file in a Markdown preview (VS Code, GitHub) to see the page with its
+images. The section between the two lines marked "paste" is the long
+description to paste into top.gg.
 
 ## Form fields
 
@@ -10,25 +16,26 @@ app at `/media/` (built with `go run ./tools/topgg`, see that file for how).
 | Bot ID | `1574183186173534369` |
 | Prefix | `/` (slash commands) |
 | Invite link | `https://discord.com/oauth2/authorize?client_id=1574183186173534369` |
-| Website | `https://playradar-production.up.railway.app` |
-| Support server | none yet (top.gg doesn't require one) |
-| Tags | Game, Social, Fun, Utility, Leveling (pick the closest five the form offers; add "steam" if custom tags are allowed) |
-| Background / banner | `https://playradar-production.up.railway.app/media/banner.png` (1600x600) |
+| Website | `https://player.gg` |
+| Support server | player.gg's Discord server, if there is one (top.gg doesn't require it) |
+| Tags | Game, Social, Fun, Utility, Leveling (the closest five the form offers; add "steam" if custom tags are allowed) |
+| Background / banner | [`topgg/banner-official.png`](topgg/banner-official.png) (1600x600; upload it, or host it on player.gg) |
 
-## Short description (156 of 200 characters)
+## Short description (153 of 200 characters)
 
 ```
-Steam stats for your server: profile cards, Four Favorites, roasts, crowns, a pile-of-shame picker and player.gg playtests. Unofficial, built for player.gg.
+Steam stats for your server: profile cards, Four Favorites, roasts, crowns, a pile-of-shame picker and playtests. The official player.gg app for Discord.
 ```
 
-## Long description (Markdown)
+## Long description
 
-```markdown
-![Player.gg for Discord](https://playradar-production.up.railway.app/media/banner.png)
+<!-- paste: start -->
+
+![Player.gg for Discord](topgg/banner-official.png)
 
 **Who here actually plays Elden Ring? Who has the most hours in Deep Rock? What should we play tonight?**
 
-Player.gg turns everyone's Steam library into something your server can talk about: profile cards, Four Favorites, a court that roasts your playtime, crowns for the most hours in a game, and playtests you can join before release.
+The official player.gg app turns everyone's Steam library into something your server can talk about: profile cards, Four Favorites, a court that roasts your playtime, crowns for the most hours in a game, and player.gg playtests you can join before release.
 
 **Free** · **Slash commands only** · **Works in servers, DMs and as a user app** · **No Steam password, ever**
 
@@ -89,7 +96,7 @@ Your Game of the Year race from this year's releases, with a button to vote on p
 
 ## 🧪 Playtests from player.gg
 
-`/playtests` lists live and upcoming playtests you can join. Admins can run `/radar` to post new ones in a channel, with a note when a playtest fits what people in the server play.
+`/playtests` lists live and upcoming player.gg playtests you can join. Admins can run `/radar` to post new ones in a channel, with a note when a playtest fits what people in the server play.
 
 ![The /playtests card](https://playradar-production.up.railway.app/media/card-playtests.png)
 
@@ -121,20 +128,27 @@ In Steam, go to Profile → Edit Profile → Privacy Settings and set **Game det
 **Can I use it without adding it to a server?**
 Yes. Add it as a user app and use it anywhere, including DMs.
 
-**Is this an official player.gg bot?**
-Not yet. It's an unofficial proof of concept built for player.gg, using public Steam data and links to player.gg pages. It isn't affiliated with Valve or Steam.
+**Do I need a player.gg account?**
+No. Link Steam and every command works. A player.gg account adds your shelf, reviews and playtest invites.
 
 ## 🔗 Links
 
 - [Add Player.gg to Discord](https://discord.com/oauth2/authorize?client_id=1574183186173534369)
 - [Create your player.gg account](https://player.gg/join)
-- [Privacy](https://playradar-production.up.railway.app/privacy) · [Terms](https://playradar-production.up.railway.app/terms)
-```
+- [player.gg](https://player.gg)
+
+<!-- paste: end -->
+
+## Before it goes live
+
+- Host the banner somewhere public (top.gg needs a URL, or upload it as the page background) and point the first image at it.
+- Swap the bot's Discord description and its privacy and terms pages from "unofficial proof of concept" to the official wording, and point Website and Support at player.gg's own pages.
+- The card screenshots and cover images are served by the bot at `/media/` (built with `go run ./tools/topgg`; the official banner with `-banner-only -banner banner-official.png -footer "..."`, written to `docs/topgg/`).
 
 ## How this was shaped
 
 Patterns from popular listings in the same space (November 2026):
 
-- **.fmbot** (1.06M servers, music stats, the model for this bot): one-line pitch, "connect an account to get started", emoji-headed feature and social sections, links, and a support note that it's not affiliated with Last.fm.
+- **.fmbot** (1.06M servers, music stats, the model for this bot): one-line pitch, "connect an account to get started", emoji-headed feature and social sections, and links.
 - **Soova** (1.87K votes, Steam game nights): opens with a question, one section per feature with an example of the output, a privacy and safety section, "setup takes a minute" steps and an FAQ. Uses a background banner.
 - **FreeStuff** (268K servers, free games): "easy to set up", a getting-started checklist, keyword tags and a screenshot of what its posts look like.
