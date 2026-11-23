@@ -48,6 +48,7 @@ type Bot struct {
 	PlaytestsSource string
 	CollectionsFile string // hand-picked game collections (data/collections.json)
 	MomentsFile     string // rare gaming-moment posts (data/moments.json)
+	DiscordLinking  bool   // /link offers one-click linking from Discord connections
 	Log             *slog.Logger
 	Now             func() time.Time
 	// EditDelay is the minimum wait before editing a deferred reply, so the

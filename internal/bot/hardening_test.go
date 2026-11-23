@@ -52,3 +52,17 @@ func TestBadCollectionsFileIsTolerated(t *testing.T) {
 		t.Fatalf("empty collection = %s", r.Data)
 	}
 }
+
+// With Discord linking on, /link's button goes to the one-click path and the
+// text keeps a plain Steam sign-in link.
+func TestLinkOffersDiscordConnection(t *testing.T) {
+	h := newHarness(t)
+	h.b.DiscordLinking = true
+	r, _ := h.send(t, cmd("link", "G", "999", "0"))
+	d := valid(t, messageData(t, r))
+	steam := button(t, d, func(c discord.Component) bool { return c.Label == "Link Steam" })
+	if !strings.HasPrefix(steam.URL, "https://bot.example/link/discord?t=") ||
+		!strings.Contains(texts(d), "One click if Steam is connected to your Discord. Or [sign in on Steam](https://bot.example/link?t=") {
+		t.Fatalf("link card = %s %s", steam.URL, texts(d))
+	}
+}

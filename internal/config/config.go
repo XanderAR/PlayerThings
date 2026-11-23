@@ -20,39 +20,42 @@ type Config struct {
 	DiscordAppID     string
 	DiscordPublicKey string // hex, from the Developer Portal "General Information" page
 	DiscordBotToken  string // only needed to register slash commands
-	SteamAPIKey      string
-	LinkSecret       string // signs account-link URLs; 32+ random characters
-	DatabasePath     string
-	PlaytestsFile    string
-	PlaytestsSource  string // shown in the /playtests footer
-	CollectionsFile  string
-	MomentsFile      string
-	Contact          string // shown on the privacy page
-	SyncInterval     time.Duration
-	SteamDailyBudget int
-	PlayerGGURL      string // where every "on player.gg" button points
-	AvatarURL        string // optional avatar for scheduled posts
+	// DiscordClientSecret turns on one-click linking from Discord connections.
+	DiscordClientSecret string
+	SteamAPIKey         string
+	LinkSecret          string // signs account-link URLs; 32+ random characters
+	DatabasePath        string
+	PlaytestsFile       string
+	PlaytestsSource     string // shown in the /playtests footer
+	CollectionsFile     string
+	MomentsFile         string
+	Contact             string // shown on the privacy page
+	SyncInterval        time.Duration
+	SteamDailyBudget    int
+	PlayerGGURL         string // where every "on player.gg" button points
+	AvatarURL           string // optional avatar for scheduled posts
 }
 
 // Load reads the configuration from the environment, applying defaults.
 func Load() (Config, error) {
 	c := Config{
-		AppName:          env("APP_NAME", "PlayRadar"),
-		BaseURL:          strings.TrimRight(env("BASE_URL", "http://localhost:8080"), "/"),
-		Port:             env("PORT", "8080"),
-		DiscordAppID:     env("DISCORD_APP_ID", ""),
-		DiscordPublicKey: env("DISCORD_PUBLIC_KEY", ""),
-		DiscordBotToken:  env("DISCORD_BOT_TOKEN", ""),
-		SteamAPIKey:      env("STEAM_API_KEY", ""),
-		LinkSecret:       env("LINK_SECRET", ""),
-		DatabasePath:     env("DATABASE_PATH", "data/playradar.db"),
-		PlaytestsFile:    env("PLAYTESTS_FILE", "data/playtests.json"),
-		PlaytestsSource:  env("PLAYTESTS_SOURCE", "public playtest pages"),
-		CollectionsFile:  env("COLLECTIONS_FILE", "data/collections.json"),
-		MomentsFile:      env("MOMENTS_FILE", "data/moments.json"),
-		Contact:          env("CONTACT", ""),
-		PlayerGGURL:      strings.TrimRight(env("PLAYERGG_URL", "https://player.gg"), "/"),
-		AvatarURL:        env("AVATAR_URL", ""),
+		AppName:             env("APP_NAME", "PlayRadar"),
+		BaseURL:             strings.TrimRight(env("BASE_URL", "http://localhost:8080"), "/"),
+		Port:                env("PORT", "8080"),
+		DiscordAppID:        env("DISCORD_APP_ID", ""),
+		DiscordPublicKey:    env("DISCORD_PUBLIC_KEY", ""),
+		DiscordBotToken:     env("DISCORD_BOT_TOKEN", ""),
+		DiscordClientSecret: env("DISCORD_CLIENT_SECRET", ""),
+		SteamAPIKey:         env("STEAM_API_KEY", ""),
+		LinkSecret:          env("LINK_SECRET", ""),
+		DatabasePath:        env("DATABASE_PATH", "data/playradar.db"),
+		PlaytestsFile:       env("PLAYTESTS_FILE", "data/playtests.json"),
+		PlaytestsSource:     env("PLAYTESTS_SOURCE", "public playtest pages"),
+		CollectionsFile:     env("COLLECTIONS_FILE", "data/collections.json"),
+		MomentsFile:         env("MOMENTS_FILE", "data/moments.json"),
+		Contact:             env("CONTACT", ""),
+		PlayerGGURL:         strings.TrimRight(env("PLAYERGG_URL", "https://player.gg"), "/"),
+		AvatarURL:           env("AVATAR_URL", ""),
 	}
 
 	interval, err := time.ParseDuration(env("SYNC_INTERVAL", "12h"))

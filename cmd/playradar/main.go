@@ -172,6 +172,7 @@ func serve(cfg config.Config) {
 		PlaytestsSource: cfg.PlaytestsSource,
 		CollectionsFile: cfg.CollectionsFile,
 		MomentsFile:     cfg.MomentsFile,
+		DiscordLinking:  cfg.DiscordClientSecret != "",
 		Log:             log,
 		EditDelay:       500 * time.Millisecond,
 	}
@@ -187,6 +188,7 @@ func serve(cfg config.Config) {
 		LinkSecret:   []byte(cfg.LinkSecret),
 		Interactions: b,
 		Render:       render.New(),
+		Discord:      web.NewDiscordOAuth(cfg.DiscordAppID, cfg.DiscordClientSecret),
 		Log:          log,
 	}
 

@@ -23,12 +23,21 @@ func (b *Bot) cmdLink(ctx context.Context, in *discord.Interaction) discord.Resp
 		DiscordID: user.ID, GuildID: in.GuildID, Name: user.DisplayName(), Expires: b.now().Add(30 * time.Minute),
 	})
 	linkURL := b.Links.Site + "/link?t=" + url.QueryEscape(token)
+	steamOnly := linkURL
+	if b.DiscordLinking {
+		// One click when Steam is connected to their Discord; the page it
+		// lands on falls back to Steam sign-in when it isn't.
+		linkURL = b.Links.Site + "/link/discord?t=" + url.QueryEscape(token)
+	}
 
 	acct, linked, err := b.Store.Account(ctx, user.ID, steamPlatform)
 	if err != nil {
 		return b.oops(err, "load account")
 	}
 	steam, label := "**Steam**\n-# Library and playtime, synced twice a day", "Link Steam"
+	if b.DiscordLinking {
+		steam = "**Steam**\n-# One click if Steam is connected to your Discord. Or [sign in on Steam](" + steamOnly + ")"
+	}
 	if linked {
 		steam = fmt.Sprintf("**Steam** · linked as **%s**\n-# Link again to switch accounts or refresh your library", acct.DisplayName)
 		label = "Re-link"

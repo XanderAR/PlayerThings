@@ -21,6 +21,7 @@ p, li { color:var(--muted); }
 ul { padding-left:20px; }
 a { color:var(--accent); }
 .btn { display:inline-block; background:var(--accent); color:#fff; text-decoration:none; font-weight:600; padding:12px 20px; border-radius:10px; margin-top:8px; }
+.btn-alt { background:transparent; color:var(--accent); border:1px solid var(--line); }
 .note { background:var(--warn-bg); color:var(--warn); border-radius:10px; padding:12px 14px; font-size:15px; }
 footer { margin-top:24px; font-size:14px; color:var(--muted); text-align:center; }
 footer a { color:var(--muted); }
@@ -49,10 +50,14 @@ footer a { color:var(--muted); }
 {{define "link"}}
 <h1>Link your Steam account</h1>
 {{if .For}}<p>This link is for the Discord account <b>{{.For}}</b>. If that isn't you, close this page: someone may be trying to link your Steam to their account.</p>{{end}}
-<p>You'll sign in on Steam's own site. {{.App}} only receives your Steam ID, never your password.</p>
-<p>We then read your public Steam profile, the games you own and your playtime, and refresh them about twice a day.</p>
+{{if .Discord}}<p><b>Fastest:</b> if Steam is connected to your Discord account, approve a Discord sign-in and we'll use that Steam account. We only read your connections to find it, and the access ends straight away.</p>
+<a class="btn" href="/link/discord?t={{.Token}}">Use the Steam account on my Discord</a>
+<p style="margin-top:20px">Or sign in on Steam's own site. {{.App}} only receives your Steam ID, never your password.</p>
+<a class="btn btn-alt" href="{{.SteamURL}}">Sign in through Steam</a>
+{{else}}<p>You'll sign in on Steam's own site. {{.App}} only receives your Steam ID, never your password.</p>
+<a class="btn" href="{{.SteamURL}}">Sign in through Steam</a>{{end}}
+<p style="margin-top:20px">We then read your public Steam profile, the games you own and your playtime, and refresh them about twice a day.</p>
 {{if .InServer}}<p>Because you started from a server, you'll also appear on that server's leaderboards. Turn that off any time with <b>/visibility</b>.</p>{{end}}
-<a class="btn" href="{{.SteamURL}}">Sign in through Steam</a>
 <p style="margin-top:20px;font-size:14px">Your Steam "Game details" privacy setting must be Public for your library to show. <b>/unlink</b> deletes everything.</p>
 {{end}}
 
@@ -62,6 +67,7 @@ footer a { color:var(--muted); }
 {{if .Private}}
 <p class="note">Steam is hiding your library. In Steam, open <b>Profile → Edit Profile → Privacy Settings</b> and set <b>Game details</b> to Public. We'll pick it up within a few hours.</p>
 {{end}}
+{{if .ActionURL}}<a class="btn" href="{{.ActionURL}}">{{.ActionLabel}}</a>{{end}}
 {{if .Done}}<p>You can close this tab. While you're here, <a href="{{.PlayerGG}}/join">start your player.gg shelf</a>.</p>{{end}}
 {{end}}
 
@@ -72,6 +78,7 @@ footer a { color:var(--muted); }
 <ul>
 <li>Your Discord user ID.</li>
 <li>Your Steam ID, Steam display name, avatar and profile link.</li>
+<li>If you link through Discord, we read your Discord connections once to find your verified Steam account. We keep only the Steam ID and end the access straight away.</li>
 <li>The Steam games you own, your playtime and when you last played, refreshed about twice a day, plus daily playtime snapshots.</li>
 <li>Which servers you've chosen to appear in.</li>
 <li>For server admins who turn on scheduled posts: the channel and the webhook used to post there.</li>

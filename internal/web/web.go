@@ -50,6 +50,7 @@ type Server struct {
 	LinkSecret   []byte
 	Interactions http.Handler
 	Render       *render.Renderer // draws cover shelves; nil disables /render
+	Discord      *DiscordOAuth    // one-click linking from Discord connections; nil or no secret disables it
 	Log          *slog.Logger
 	Now          func() time.Time
 }
@@ -61,6 +62,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /{$}", s.home)
 	mux.HandleFunc("GET /link", s.linkPage)
 	mux.HandleFunc("GET /link/steam/callback", s.steamCallback)
+	mux.HandleFunc("GET /link/discord", s.discordStart)
+	mux.HandleFunc("GET /link/discord/callback", s.discordCallback)
 	mux.HandleFunc("GET /go", s.goRedirect)
 	mux.HandleFunc("GET /privacy", s.privacy)
 	mux.HandleFunc("GET /terms", s.terms)
@@ -170,6 +173,8 @@ func (s *Server) linkPage(w http.ResponseWriter, r *http.Request) {
 		"SteamURL": s.Steam.LoginURL(s.callbackURL(token), s.BaseURL),
 		"InServer": claims.GuildID != "",
 		"For":      claims.Name,
+		"Discord":  s.Discord.Enabled(),
+		"Token":    token,
 	})
 }
 
@@ -189,6 +194,12 @@ func (s *Server) steamCallback(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	s.finishLink(w, r, claims, steamID)
+}
+
+// finishLink stores a verified Steam account for the Discord user in claims,
+// opts them into the server /link was run in, and loads their library.
+func (s *Server) finishLink(w http.ResponseWriter, r *http.Request, claims linktoken.Claims, steamID string) {
 	ctx := r.Context()
 	if err := s.Store.LinkAccount(ctx, store.Account{
 		DiscordID: claims.DiscordID, Platform: "steam", ExternalID: steamID, LinkedAt: s.now(),
