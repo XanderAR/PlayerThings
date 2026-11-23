@@ -117,7 +117,9 @@ func digits(s string) bool {
 // Sign returns the signature for a layout and encoded tiles.
 func Sign(secret []byte, layout, encoded string) string {
 	mac := hmac.New(sha256.New, secret)
-	fmt.Fprintf(mac, "shelf|v1|%s|%s", layout, encoded)
+	// v2: images drawn before art for newer games could be found were cached
+	// by Discord with blank tiles; a new version gives every image a new URL.
+	fmt.Fprintf(mac, "shelf|v2|%s|%s", layout, encoded)
 	return hex.EncodeToString(mac.Sum(nil)[:12])
 }
 
@@ -207,16 +209,18 @@ var (
 	medals     = []color.RGBA{{0xf5, 0xc5, 0x42, 0xff}, {0xc9, 0xd1, 0xd9, 0xff}, {0xd0, 0x8c, 0x5b, 0xff}}
 )
 
-// Shelf draws up to 10 games as a JPEG.
-func (r *Renderer) Shelf(ctx context.Context, layout string, tiles []Tile) ([]byte, error) {
+// Shelf draws up to 10 games as a JPEG. complete is false when some art
+// couldn't be fetched (the tile is left blank); such images aren't cached, so
+// a later request can fill them in.
+func (r *Renderer) Shelf(ctx context.Context, layout string, tiles []Tile) (img []byte, complete bool, err error) {
 	if err := r.init(); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	key := layout + "|" + Encode(tiles)
 	r.mu.Lock()
 	if out, ok := r.output[key]; ok {
 		r.mu.Unlock()
-		return out, nil
+		return out, true, nil
 	}
 	r.mu.Unlock()
 
@@ -224,7 +228,7 @@ func (r *Renderer) Shelf(ctx context.Context, layout string, tiles []Tile) ([]by
 	case r.busy <- struct{}{}:
 		defer func() { <-r.busy }()
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return nil, false, ctx.Err()
 	}
 
 	cols, rows := size(layout)
@@ -243,11 +247,13 @@ func (r *Renderer) Shelf(ctx context.Context, layout string, tiles []Tile) ([]by
 	draw.Draw(canvas, canvas.Bounds(), &image.Uniform{background}, image.Point{}, draw.Src)
 
 	art := r.fetchAll(ctx, tiles)
+	complete = true
 	for i := 0; i < cols*rows; i++ {
 		x := gap + (i%cols)*(tileW+gap)
 		y := gap + (i/cols)*(tileH+captionH+gap)
 		cell := image.Rect(x, y, x+tileW, y+tileH)
 		if i >= len(tiles) || art[i] == nil {
+			complete = complete && i >= len(tiles)
 			draw.Draw(canvas, cell, &image.Uniform{emptyTile}, image.Point{}, draw.Src)
 		} else {
 			drawCover(canvas, cell, art[i])
@@ -270,16 +276,19 @@ func (r *Renderer) Shelf(ctx context.Context, layout string, tiles []Tile) ([]by
 
 	var buf bytes.Buffer
 	if err := jpeg.Encode(&buf, canvas, &jpeg.Options{Quality: 88}); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	out := buf.Bytes()
+	if !complete {
+		return out, false, nil
+	}
 	r.mu.Lock()
 	if len(r.output) > 200 {
 		r.output = map[string][]byte{}
 	}
 	r.output[key] = out
 	r.mu.Unlock()
-	return out, nil
+	return out, true, nil
 }
 
 // fetchAll gets art for every tile in parallel; missing art stays nil.

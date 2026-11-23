@@ -90,13 +90,18 @@ func (s *Server) shelf(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
-	img, err := s.Render.Shelf(ctx, layout, tiles)
+	img, complete, err := s.Render.Shelf(ctx, layout, tiles)
 	if err != nil {
 		s.serverError(w, "render shelf", err)
 		return
 	}
 	w.Header().Set("Content-Type", "image/jpeg")
-	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	if complete {
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	} else {
+		// Some art was missing (often a Steam hiccup): let caches ask again soon.
+		w.Header().Set("Cache-Control", "public, max-age=600")
+	}
 	w.Write(img)
 }
 

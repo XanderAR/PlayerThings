@@ -91,7 +91,7 @@ func TestShelf(t *testing.T) {
 		return "", "", nil
 	}
 
-	out, err := r.Shelf(context.Background(), Grid, []Tile{{"1", 24720}, {"2", 300}, {"3", 5}, {"4", 60}})
+	out, complete, err := r.Shelf(context.Background(), Grid, []Tile{{"1", 24720}, {"2", 300}, {"3", 5}, {"4", 60}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,10 +124,15 @@ func TestShelf(t *testing.T) {
 	if os.Getenv("SHELF_OUT") != "" {
 		os.WriteFile(os.Getenv("SHELF_OUT"), out, 0o644)
 	}
-	// Rendering again is served from the cache.
-	again, _ := r.Shelf(context.Background(), Grid, []Tile{{"1", 24720}, {"2", 300}, {"3", 5}, {"4", 60}})
-	if !bytes.Equal(out, again) {
-		t.Fatal("second render differs")
+	// App 3 has no art anywhere, so the image is marked incomplete and not cached.
+	if complete {
+		t.Fatal("a shelf with a blank tile was reported complete")
+	}
+	// A full shelf is cached: the second render comes from memory.
+	full, complete, _ := r.Shelf(context.Background(), Grid, []Tile{{"1", 24720}, {"4", 60}})
+	again, _, _ := r.Shelf(context.Background(), Grid, []Tile{{"1", 24720}, {"4", 60}})
+	if !complete || !bytes.Equal(full, again) {
+		t.Fatal("complete shelf should be cached")
 	}
 }
 
@@ -144,7 +149,7 @@ func TestLiveShelf(t *testing.T) {
 	if os.Getenv("SHELF_LAYOUT") == Strip {
 		layout, tiles = Strip, tiles[:5]
 	}
-	img, err := New().Shelf(context.Background(), layout, tiles)
+	img, _, err := New().Shelf(context.Background(), layout, tiles)
 	if err != nil {
 		t.Fatal(err)
 	}
