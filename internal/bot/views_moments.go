@@ -434,7 +434,7 @@ func (b *Bot) momentCard(ctx context.Context, m Moment, guildID string) (discord
 	total := 0
 	for _, c := range m.Choices {
 		total += counts[c.ID]
-		tally = append(tally, fmt.Sprintf("%s **%d** %s", c.Emoji, counts[c.ID], strings.ToLower(c.Label)))
+		tally = append(tally, fmt.Sprintf("%s **%d** %s", c.Emoji, counts[c.ID], c.Label))
 	}
 	if total > 0 {
 		parts = append(parts, line(), discord.Text(strings.Join(tally, "  ·  ")))

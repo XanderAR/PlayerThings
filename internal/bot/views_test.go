@@ -686,7 +686,7 @@ func TestMomentPostsOnceAndCountsVotes(t *testing.T) {
 	}
 	h.send(t, click("200", "G", "mo:launch:playing"))
 	r, _ := h.send(t, click("300", "G", "mo:launch:playing"))
-	if r.Type != discord.ResponseUpdateMessage || !strings.Contains(texts(messageData(t, r)), "🎮 **2** i'm playing it") {
+	if r.Type != discord.ResponseUpdateMessage || !strings.Contains(texts(messageData(t, r)), "🎮 **2** I'm playing it") {
 		t.Fatalf("tally = %s", texts(messageData(t, r)))
 	}
 	// Unlinking removes your vote.

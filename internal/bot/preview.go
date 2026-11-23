@@ -54,7 +54,7 @@ func Preview(ctx context.Context, dir string, files PreviewFiles, siteURL, youID
 	b := &Bot{
 		AppName: "PlayRadar", InstallURL: "https://discord.com/oauth2/authorize",
 		Store: st, Syncer: previewSyncer{}, Discord: capture,
-		LinkSecret:    []byte(strings.Repeat("p", 32)),
+		LinkSecret:    previewSecret(files.LinkSecret),
 		Links:         Links{Site: siteURL, PlayerGG: "https://player.gg"},
 		PlaytestsFile: playtestsFile, PlaytestsSource: "player.gg", CollectionsFile: files.Collections, MomentsFile: files.Moments,
 	}
@@ -113,8 +113,6 @@ func Preview(ctx context.Context, dir string, files PreviewFiles, siteURL, youID
 	run("/chart", command("chart"))
 	run("/playtests", command("playtests"))
 	run("/playtests → details", clickOn("pt:s:0:", "0"))
-	run("/visibility hide", command("visibility", opt("setting", "hide")))
-	run("/unlink", command("unlink"))
 	run("/goty", command("goty"))
 	run("/goty scope:server", command("goty", opt("scope", "server")))
 	run("/collection", command("collection"))
@@ -125,6 +123,10 @@ func Preview(ctx context.Context, dir string, files PreviewFiles, siteURL, youID
 		}
 		run("Moment → after a vote", clickOn("mo:"+ms[0].ID+":"+ms[0].Choices[0].ID))
 	}
+
+	// Last, since hiding changes what the server cards show.
+	run("/visibility hide", command("visibility", opt("setting", "hide")))
+	run("/unlink", command("unlink"))
 
 	all, err := playtests.Load(playtestsFile)
 	if err != nil {
