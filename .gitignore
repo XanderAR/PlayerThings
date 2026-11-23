@@ -5,4 +5,4 @@ data/*.db-*
 /playradar.exe
 
 # Rendered trailer (go run ./tools/trailer)
-trailer/
+/trailer/
