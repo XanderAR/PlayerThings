@@ -137,13 +137,16 @@ type Interaction struct {
 
 // InteractionData holds command or component details.
 type InteractionData struct {
-	ID            string    `json:"id"`
-	Name          string    `json:"name"`
-	Options       []Option  `json:"options"`
-	Resolved      *Resolved `json:"resolved"`
-	CustomID      string    `json:"custom_id"`
-	ComponentType int       `json:"component_type"`
-	Values        []string  `json:"values"` // chosen select menu options
+	// ID is the command's ID (a string) for commands, but the clicked
+	// component's numeric ID for button and menu clicks on Components V2
+	// messages, so it's kept raw.
+	ID            json.RawMessage `json:"id"`
+	Name          string          `json:"name"`
+	Options       []Option        `json:"options"`
+	Resolved      *Resolved       `json:"resolved"`
+	CustomID      string          `json:"custom_id"`
+	ComponentType int             `json:"component_type"`
+	Values        []string        `json:"values"` // chosen select menu options
 }
 
 // Resolved carries full objects for users mentioned in options.

@@ -88,7 +88,8 @@ func click(user, guild, customID string, values ...string) map[string]any {
 	in := map[string]any{
 		"type":  discord.InteractionMessageComponent,
 		"token": "itok",
-		"data":  map[string]any{"custom_id": customID, "component_type": 2, "values": values},
+		// Clicks on Components V2 messages carry the component's numeric id.
+		"data": map[string]any{"id": 7, "custom_id": customID, "component_type": 2, "values": values},
 	}
 	u := map[string]any{"id": user, "username": "user" + user}
 	if guild != "" {

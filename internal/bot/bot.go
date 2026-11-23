@@ -68,6 +68,7 @@ func (b *Bot) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	var in discord.Interaction
 	if err := json.Unmarshal(body, &in); err != nil {
+		b.log().Error("decode interaction", "err", err)
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
