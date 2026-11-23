@@ -28,8 +28,14 @@ const (
 	ResponseAutocomplete    = 8
 )
 
-// FlagEphemeral makes a reply visible only to the person who ran the command.
-const FlagEphemeral = 1 << 6
+// Message flags.
+const (
+	// FlagEphemeral makes a reply visible only to the person who ran the command.
+	FlagEphemeral = 1 << 6
+	// FlagComponentsV2 lays the message out entirely with components
+	// (containers, sections, text, galleries). Content and embeds must be empty.
+	FlagComponentsV2 = 1 << 15
+)
 
 // Where a command can be used, and how the app can be installed.
 const (
@@ -55,8 +61,18 @@ const (
 
 // Component types and button styles.
 const (
-	ComponentActionRow = 1
-	ComponentButton    = 2
+	ComponentActionRow    = 1
+	ComponentButton       = 2
+	ComponentStringSelect = 3
+	ComponentSection      = 9
+	ComponentTextDisplay  = 10
+	ComponentThumbnail    = 11
+	ComponentMediaGallery = 12
+	ComponentSeparator    = 14
+	ComponentContainer    = 17
+
+	SpacingSmall = 1
+	SpacingLarge = 2
 
 	ButtonPrimary   = 1
 	ButtonSecondary = 2
@@ -127,6 +143,7 @@ type InteractionData struct {
 	Resolved      *Resolved `json:"resolved"`
 	CustomID      string    `json:"custom_id"`
 	ComponentType int       `json:"component_type"`
+	Values        []string  `json:"values"` // chosen select menu options
 }
 
 // Resolved carries full objects for users mentioned in options.
@@ -288,20 +305,92 @@ type EmbedAuthor struct {
 	IconURL string `json:"icon_url,omitempty"`
 }
 
-// Component is an action row or a button.
+// Component is any message component. Which fields apply depends on Type.
 type Component struct {
 	Type       int         `json:"type"`
-	Components []Component `json:"components,omitempty"`
+	Components []Component `json:"components,omitempty"` // action row, section, container
 	Style      int         `json:"style,omitempty"`
 	Label      string      `json:"label,omitempty"`
 	CustomID   string      `json:"custom_id,omitempty"`
 	URL        string      `json:"url,omitempty"`
 	Disabled   bool        `json:"disabled,omitempty"`
+
+	Content     string         `json:"content,omitempty"`      // text display (markdown)
+	Accessory   *Component     `json:"accessory,omitempty"`    // section: thumbnail or button
+	Media       *Media         `json:"media,omitempty"`        // thumbnail
+	Description string         `json:"description,omitempty"`  // thumbnail alt text
+	Items       []MediaItem    `json:"items,omitempty"`        // media gallery
+	Divider     *bool          `json:"divider,omitempty"`      // separator
+	Spacing     int            `json:"spacing,omitempty"`      // separator
+	AccentColor *int           `json:"accent_color,omitempty"` // container
+	Options     []SelectOption `json:"options,omitempty"`      // string select
+	Placeholder string         `json:"placeholder,omitempty"`  // string select
 }
 
-// ActionRow groups up to five buttons.
+// Media points at an image by URL.
+type Media struct {
+	URL string `json:"url"`
+}
+
+// MediaItem is one image in a media gallery.
+type MediaItem struct {
+	Media       Media  `json:"media"`
+	Description string `json:"description,omitempty"`
+}
+
+// SelectOption is one choice in a select menu.
+type SelectOption struct {
+	Label       string `json:"label"`
+	Value       string `json:"value"`
+	Description string `json:"description,omitempty"`
+}
+
+// ActionRow groups up to five buttons, or one select menu.
 func ActionRow(buttons ...Component) Component {
 	return Component{Type: ComponentActionRow, Components: buttons}
+}
+
+// Container is a card with an optional accent bar (color < 0 for none).
+func Container(accent int, children ...Component) Component {
+	c := Component{Type: ComponentContainer, Components: children}
+	if accent >= 0 {
+		c.AccentColor = &accent
+	}
+	return c
+}
+
+// Text is a block of markdown.
+func Text(markdown string) Component {
+	return Component{Type: ComponentTextDisplay, Content: markdown}
+}
+
+// Section shows 1-3 blocks of text beside an accessory (a Thumbnail or a button).
+func Section(accessory Component, texts ...string) Component {
+	c := Component{Type: ComponentSection, Accessory: &accessory}
+	for _, t := range texts {
+		c.Components = append(c.Components, Text(t))
+	}
+	return c
+}
+
+// Thumbnail is a small image, used as a section accessory.
+func Thumbnail(url, alt string) Component {
+	return Component{Type: ComponentThumbnail, Media: &Media{URL: url}, Description: truncate(alt, 1024)}
+}
+
+// Gallery shows 1-10 images in a grid.
+func Gallery(items ...MediaItem) Component {
+	return Component{Type: ComponentMediaGallery, Items: items}
+}
+
+// Separator adds space between components, with or without a visible line.
+func Separator(line bool, spacing int) Component {
+	return Component{Type: ComponentSeparator, Divider: &line, Spacing: spacing}
+}
+
+// Select is a string select menu.
+func Select(customID, placeholder string, options ...SelectOption) Component {
+	return Component{Type: ComponentStringSelect, CustomID: customID, Placeholder: truncate(placeholder, 150), Options: options}
 }
 
 // LinkButton opens url in the browser.

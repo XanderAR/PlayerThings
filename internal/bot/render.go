@@ -11,14 +11,6 @@ import (
 	"playradar/internal/store"
 )
 
-// Embed colors.
-const (
-	colorAccent = 0x7C5CFF
-	colorLive   = 0x23A55A
-	colorSoon   = 0xF0B232
-	colorGroup  = 0x3FA9FF
-)
-
 // Links builds every outbound URL. Links to player.gg go through this app's
 // /go redirect, which counts the click and adds UTM tags.
 type Links struct {
@@ -50,6 +42,20 @@ func (l Links) Join() string { return l.PlayerGG + "/join" }
 // gameButton links to a game's player.gg page.
 func (b *Bot) gameButton(g store.Game, command, guildID string) discord.Component {
 	return discord.LinkButton(discord.Truncate(g.Name, 50)+" on player.gg", b.Links.Go(b.Links.Game(g.GameID), command, guildID))
+}
+
+// viewButton is the short "View on player.gg" link for cards about one game.
+func (b *Bot) viewButton(g store.Game, command, guildID string) discord.Component {
+	return discord.LinkButton("View on player.gg", b.Links.Go(b.Links.Game(g.GameID), command, guildID))
+}
+
+// steamStore is a game's Steam store page.
+func steamStore(appID string) string { return "https://store.steampowered.com/app/" + appID + "/" }
+
+// coverURL is a Steam game's portrait library cover (600x900). Steam serves
+// one for every app, generating it from the store art when needed.
+func coverURL(appID string) string {
+	return "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/" + appID + "/library_600x900.jpg"
 }
 
 func mention(id string) string { return "<@" + id + ">" }
@@ -108,7 +114,7 @@ func ago(t, now time.Time) string {
 	}
 }
 
-// rankLines formats numbered lines like "`1` Deep Rock Galactic · **412 h**".
+// rankLines formats ranked games: "🥇 **Deep Rock Galactic** · 412 h".
 func rankLines(games []store.PlayedGame, recent bool) string {
 	var lines []string
 	for i, g := range games {
@@ -116,11 +122,11 @@ func rankLines(games []store.PlayedGame, recent bool) string {
 		if recent {
 			m = g.MinutesRecent
 		}
-		lines = append(lines, fmt.Sprintf("`%d` %s · **%s**", i+1, g.Name, hours(m)))
+		lines = append(lines, fmt.Sprintf("%s **%s** · %s", medal(i), g.Name, hours(m)))
 	}
 	return strings.Join(lines, "\n")
 }
 
 const privateLibraryHelp = "Steam is hiding this library, so there's nothing to show yet.\n" +
 	"In Steam: **Profile → Edit Profile → Privacy Settings → Game details: Public**. " +
-	"It syncs again within a few hours, or right away with `/link`."
+	"It syncs again within a few minutes."

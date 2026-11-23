@@ -2,6 +2,7 @@ package syncer
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -13,11 +14,23 @@ import (
 	"playradar/internal/store"
 )
 
+// fakeChecker knows the listed games; anything else has no store page.
 type fakeChecker map[string]bool
 
-func (f fakeChecker) IsMultiplayer(_ context.Context, id string) (bool, bool, error) {
+func (f fakeChecker) GameDetails(_ context.Context, id string) (steam.Details, bool, error) {
 	v, ok := f[id]
-	return v, ok, nil
+	if !ok {
+		return steam.Details{}, false, nil
+	}
+	return steam.Details{Multiplayer: v, Genres: []string{"Action"}, Reviews: 1000, ReleaseYear: 2020}, true, nil
+}
+
+// failingChecker fails every lookup and counts the calls.
+type failingChecker struct{ calls *int }
+
+func (f failingChecker) GameDetails(context.Context, string) (steam.Details, bool, error) {
+	*f.calls++
+	return steam.Details{}, false, errors.New("429 Too Many Requests")
 }
 
 func TestSteamSyncAndMultiplayerWarmup(t *testing.T) {
@@ -66,11 +79,12 @@ func TestSteamSyncAndMultiplayerWarmup(t *testing.T) {
 		t.Fatalf("stats = %+v", stats)
 	}
 	g, _, _ := st.Game(ctx, "steam", "548430")
-	if g.Multiplayer == nil || !*g.Multiplayer || !strings.HasSuffix(g.ImageURL, "/548430/header.jpg") {
+	if g.Multiplayer == nil || !*g.Multiplayer || !strings.HasSuffix(g.ImageURL, "/548430/header.jpg") ||
+		g.Reviews != 1000 || g.ReleaseYear != 2020 || len(g.Genres) != 1 || g.DetailsAt.IsZero() {
 		t.Fatalf("game = %+v", g)
 	}
-	if ids, _ := st.UncheckedGames(ctx, "steam", 10); len(ids) != 0 {
-		t.Fatalf("unchecked after warmup = %v", ids)
+	if ids, _ := st.UndetailedGames(ctx, "steam", 10); len(ids) != 0 {
+		t.Fatalf("undetailed after warmup = %v", ids)
 	}
 
 	// Just synced, so the next tick leaves it alone.
@@ -108,6 +122,41 @@ func TestFailedSyncRetriesSoon(t *testing.T) {
 	}
 	if n := due(now.Add(retryFailedAfter + time.Second)); n != 1 {
 		t.Fatalf("due after the retry delay = %d", n)
+	}
+}
+
+// Games without a store page are stored as looked up; a failing store stops
+// the batch after one call instead of hammering it.
+func TestDetailsWarmup(t *testing.T) {
+	st, _ := store.Open(filepath.Join(t.TempDir(), "sync.db"))
+	defer st.Close()
+	ctx := context.Background()
+	now := time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC)
+	st.LinkAccount(ctx, store.Account{DiscordID: "100", Platform: "steam", ExternalID: "76561198000000001", LinkedAt: now})
+	st.SaveSync(ctx, "100", "steam", store.Profile{DisplayName: "Mara"},
+		[]store.Game{{GameID: "1", Name: "Known"}, {GameID: "2", Name: "Delisted"}, {GameID: "3", Name: "Other"}},
+		[]store.LibraryEntry{{GameID: "1", MinutesTotal: 300}, {GameID: "2", MinutesTotal: 200}, {GameID: "3", MinutesTotal: 100}}, now)
+
+	calls := 0
+	s := &Syncer{Store: st, Checker: failingChecker{&calls}, Interval: 12 * time.Hour, Now: func() time.Time { return now }}
+	s.tick(ctx)
+	if calls != 1 {
+		t.Fatalf("lookups after a failure = %d, want 1", calls)
+	}
+	if ids, _ := st.UndetailedGames(ctx, "steam", 10); len(ids) != 3 {
+		t.Fatalf("undetailed after failing = %v", ids)
+	}
+
+	s.Checker = fakeChecker{"1": false, "3": true}
+	s.tick(ctx)
+	if ids, _ := st.UndetailedGames(ctx, "steam", 10); len(ids) != 0 {
+		t.Fatalf("undetailed after warmup = %v", ids)
+	}
+	if g, _, _ := st.Game(ctx, "steam", "2"); g.Multiplayer != nil || g.DetailsAt.IsZero() || g.Genres != nil {
+		t.Fatalf("delisted game = %+v", g)
+	}
+	if mp, err := s.CheckGame(ctx, "3"); err != nil || mp == nil || !*mp {
+		t.Fatalf("CheckGame = %v, %v", mp, err)
 	}
 }
 

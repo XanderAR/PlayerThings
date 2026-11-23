@@ -47,9 +47,65 @@ func main() {
 		register(cfg, os.Args[2:])
 	case "stats":
 		stats(cfg)
+	case "preview":
+		preview(cfg, os.Args[2:])
 	default:
-		fmt.Fprintln(os.Stderr, "usage: playradar [serve | register [-guild ID] | stats]")
+		fmt.Fprintln(os.Stderr, "usage: playradar [serve | register [-guild ID] | stats | preview [-channel ID] [-you USER_ID]]")
 		os.Exit(2)
+	}
+}
+
+// preview renders every card from sample data and checks it against
+// Discord's component rules. With -channel it also posts each card there as
+// the bot, so Discord itself validates the layout and you can see it.
+func preview(cfg config.Config, args []string) {
+	fs := flag.NewFlagSet("preview", flag.ExitOnError)
+	channel := fs.String("channel", "", "post the cards in this channel (the bot needs to be able to send messages there)")
+	you := fs.String("you", "preview-you", "Discord user ID to show as the person running the commands")
+	fs.Parse(args)
+
+	dir, err := os.MkdirTemp("", "playradar-preview")
+	if err != nil {
+		fail("temp dir", err)
+	}
+	defer os.RemoveAll(dir)
+	ctx := context.Background()
+	cards, err := bot.Preview(ctx, dir, cfg.PlaytestsFile, cfg.BaseURL, *you)
+	if err != nil {
+		fail("render preview", err)
+	}
+	var rest *discord.Client
+	if *channel != "" {
+		if err := cfg.ValidateRegister(); err != nil {
+			fail("config", err)
+		}
+		rest = discord.NewClient(cfg.DiscordAppID, cfg.DiscordBotToken)
+		rest.UserAgent = fmt.Sprintf("DiscordBot (%s, 0.1)", cfg.BaseURL)
+		intro := discord.ResponseData{Content: "**PlayRadar card preview** · sample players and hours; buttons point at sample data."}
+		if err := rest.CreateMessage(ctx, *channel, intro); err != nil {
+			fail("post preview", err)
+		}
+	}
+	failed := 0
+	for _, c := range cards {
+		status := "ok"
+		if err := discord.CheckMessage(c.Data); err != nil {
+			status, failed = "INVALID: "+err.Error(), failed+1
+		} else if rest != nil {
+			labelled := c.Data
+			labelled.Components = append([]discord.Component{discord.Text("-# Preview · " + c.Name)}, c.Data.Components...)
+			if c.Data.Flags&discord.FlagComponentsV2 == 0 {
+				labelled = c.Data
+			}
+			if err := rest.CreateMessage(ctx, *channel, labelled); err != nil {
+				status, failed = "DISCORD REJECTED: "+err.Error(), failed+1
+			}
+			time.Sleep(700 * time.Millisecond) // stay well under the channel rate limit
+		}
+		fmt.Printf("%-28s %s\n", c.Name, status)
+	}
+	if failed > 0 {
+		os.Exit(1)
 	}
 }
 

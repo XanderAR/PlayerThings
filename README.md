@@ -8,15 +8,24 @@ This is an independent proof of concept. It uses only public Steam data and publ
 
 | Command | What it does |
 |---|---|
+| `/help` | Every command, grouped |
 | `/link` | Links Steam through Steam's own sign-in. Linking from a server opts you into that server's leaderboards |
-| `/profile [player]` | Profile card: hours, library size, most played, playing lately |
-| `/playtests [genre]` | Playtests from `data/playtests.json`, with "Request access" buttons to player.gg |
-| `/radar [channel]` | Admins: posts new playtests in a channel, noting how many members play similar games |
+| `/profile [player]` | Profile card: hours, library size, most played, playing lately, top covers |
+| `/game <game>` | One game: your hours, who here owns it, the top player, multiplayer, release year, genres, Steam reviews, iceberg tier |
+| `/iceberg [player]` | Your 40 most-played games sorted into tiers by Steam review count, with a depth score |
+| `/collage [player] [period]` | Your top 9 games as a cover grid, all time or the last 2 weeks |
 | `/whoplays <game>` | Opted-in members ranked by hours, with a crown for the top player. Game names autocomplete |
+| `/leaderboard [type]` | Server ranking by hours, last 2 weeks, games played or crowns, with tabs to switch |
+| `/crowns [player]` | Games where you have the most hours in this server, and who's next |
+| `/taste @friend` | Taste match %: shared games, hours side by side, genre split |
 | `/incommon @friends` | Games everyone owns, multiplayer first (Steam store tags) |
 | `/chart [weekly_in]` | Server's most played in the last 2 weeks. Admins can have it posted every Monday |
+| `/playtests [genre]` | Paged playtest list with "Request access" buttons and a details view |
+| `/radar [channel]` | Admins: posts new playtests in a channel, noting how many members play similar games |
 | `/visibility show/hide` | Show or hide yourself in one server |
 | `/unlink` | Deletes everything stored about you |
+
+Replies use Discord's Components V2 layout (cards, sections, galleries). `go run ./cmd/playradar preview` renders every card from sample data and checks it against Discord's component limits; add `-channel ID` to post them in a channel so Discord validates them too.
 
 Every game button opens the game's page on player.gg. `https://player.gg/explore/games/<steam app id>.steam` resolves to player.gg's own page for that game. All player.gg links pass through `/go`, which counts the click and adds `utm_source=playradar`.
 

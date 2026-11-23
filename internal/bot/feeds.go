@@ -3,7 +3,6 @@ package bot
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"playradar/internal/discord"
@@ -27,13 +26,9 @@ func (b *Bot) cmdRadar(ctx context.Context, in *discord.Interaction) discord.Res
 	if !ok {
 		return reply("The playtest radar is off. Turn it on with `/radar channel:#some-channel`.", true)
 	}
-	return message(discord.ResponseData{
-		Content: fmt.Sprintf("New playtests are posted in <#%s>.", feed.ChannelID),
-		Components: []discord.Component{discord.ActionRow(
-			discord.Button(discord.ButtonDanger, "Turn off the radar", "radar:off"),
-		)},
-		Flags: discord.FlagEphemeral,
-	})
+	return message(notice(true, colorLive, "📡 Playtest radar is on",
+		fmt.Sprintf("New playtests are posted in <#%s>, with a note when they fit what people here play.", feed.ChannelID),
+		discord.ActionRow(discord.Button(discord.ButtonDanger, "Turn off the radar", "radar:off"))))
 }
 
 func (b *Bot) radarOff(ctx context.Context, in *discord.Interaction) discord.Response {
@@ -52,7 +47,7 @@ func (b *Bot) radarOff(ctx context.Context, in *discord.Interaction) discord.Res
 			return b.oops(err, "delete radar")
 		}
 	}
-	return update(discord.ResponseData{Content: "The playtest radar is off.", ClearComponents: true})
+	return update(notice(true, colorMuted, "📡 Playtest radar is off", "Turn it back on any time with `/radar channel:#some-channel`."))
 }
 
 // setupFeed creates a webhook in the channel, saves the feed and makes its
@@ -122,18 +117,24 @@ func (b *Bot) radarWelcome(ctx context.Context, feed store.Feed) error {
 		return err
 	}
 	current := playtests.Current(all, b.now())
-	shown := current
-	if len(shown) > 3 {
-		shown = shown[:3]
+	parts := []discord.Component{
+		heading("📡 Playtest radar is on", "New playtests on player.gg land here, with a note when they fit what people here play", ""),
 	}
-	data := discord.ResponseData{Content: "📡 Playtest radar is on. New playtests will show up here."}
-	var buttons []discord.Component
-	for _, p := range shown {
-		data.Embeds = append(data.Embeds, b.playtestEmbed(p, "radar", feed.GuildID))
-		buttons = append(buttons, discord.LinkButton("Request access: "+p.Title, b.Links.Go(p.URL, "radar", feed.GuildID)))
+	for i, p := range current {
+		if i == 3 {
+			break
+		}
+		parts = append(parts, line(),
+			discord.Section(discord.LinkButton("Request access", b.Links.Go(p.URL, "radar", feed.GuildID)),
+				fmt.Sprintf("**%s**\n-# %s", p.Title, b.status(p))))
 	}
-	buttons = append(buttons, discord.LinkButton("All playtests on player.gg", b.Links.Go(b.Links.Playtests(), "radar", feed.GuildID)))
-	data.Components = []discord.Component{discord.ActionRow(buttons...)}
+	if len(current) > 0 {
+		parts = append(parts, line(), note("Open right now · `/playtests` shows the rest"))
+	}
+	data := card(false,
+		discord.Container(colorLive, parts...),
+		discord.ActionRow(b.allPlaytestsButton("radar", feed.GuildID)),
+	)
 	if err := b.post(ctx, feed, data); err != nil {
 		return err
 	}
@@ -186,41 +187,37 @@ func (b *Bot) postNewPlaytests(ctx context.Context) {
 
 // radarMessage announces one playtest, noting how many members play similar games.
 func (b *Bot) radarMessage(ctx context.Context, guildID string, p playtests.Playtest) (discord.ResponseData, error) {
-	matches, err := b.Store.MembersOwningAny(ctx, guildID, steamPlatform, p.SimilarSteamApps)
-	if err != nil {
-		return discord.ResponseData{}, err
+	fit := b.fitLine(ctx, guildID, p)
+	kicker := "📡 New playtest"
+	if fit != "" {
+		kicker = "📡 New playtest that fits this server"
 	}
-	e := b.playtestEmbed(p, "radar", guildID)
-	e.Title = p.Title + " · " + strings.ToLower(p.Status(b.now()))
-	e.Author = &discord.EmbedAuthor{Name: "New playtest"}
-	if matches > 0 {
-		e.Author.Name = "New playtest that fits this server"
-		var names []string
-		for _, id := range p.SimilarSteamApps {
-			if g, ok, _ := b.Store.Game(ctx, steamPlatform, id); ok {
-				names = append(names, g.Name)
-			}
-			if len(names) == 2 {
-				break
-			}
-		}
-		lead := fmt.Sprintf("**%d %s here** %s similar games", matches, plural(matches, "member", "members"), plural(matches, "plays", "play"))
-		if len(names) > 0 {
-			lead = fmt.Sprintf("**%d %s here** %s games like %s", matches, plural(matches, "member", "members"), plural(matches, "plays", "play"), strings.Join(names, " and "))
-		}
-		e.Description = strings.TrimSpace(lead + ". " + p.Summary)
+	accent := colorSoon
+	if p.Live(b.now()) {
+		accent = colorLive
 	}
+	var parts []discord.Component
 	if p.Image != "" {
-		e.Thumbnail = nil
-		e.Image = &discord.EmbedImage{URL: p.Image}
+		parts = append(parts, discord.Gallery(discord.MediaItem{Media: discord.Media{URL: p.Image}}))
 	}
-	return discord.ResponseData{
-		Embeds: []discord.Embed{e},
-		Components: []discord.Component{discord.ActionRow(
+	head := fmt.Sprintf("-# %s\n## %s\n-# %s", kicker, p.Title, b.status(p))
+	if p.Studio != "" {
+		head += " · " + p.Studio
+	}
+	parts = append(parts, discord.Text(head))
+	if fit != "" {
+		parts = append(parts, discord.Text("🎯 "+fit))
+	}
+	if p.Summary != "" {
+		parts = append(parts, discord.Text(p.Summary))
+	}
+	return card(false,
+		discord.Container(accent, parts...),
+		discord.ActionRow(
 			discord.LinkButton("Request access", b.Links.Go(p.URL, "radar", guildID)),
-			discord.LinkButton("All playtests on player.gg", b.Links.Go(b.Links.Playtests(), "radar", guildID)),
-		)},
-	}, nil
+			b.allPlaytestsButton("radar", guildID),
+		),
+	), nil
 }
 
 func (b *Bot) postDueCharts(ctx context.Context) {
@@ -252,6 +249,28 @@ func (b *Bot) postDueCharts(ctx context.Context) {
 	}
 }
 
+// linkButtonsOnly drops buttons that call back into the app from top-level
+// action rows, and rows left empty.
+func linkButtonsOnly(comps []discord.Component) []discord.Component {
+	var out []discord.Component
+	for _, c := range comps {
+		if c.Type != discord.ComponentActionRow {
+			out = append(out, c)
+			continue
+		}
+		var kept []discord.Component
+		for _, btn := range c.Components {
+			if btn.Type == discord.ComponentButton && btn.Style == discord.ButtonLink {
+				kept = append(kept, btn)
+			}
+		}
+		if len(kept) > 0 {
+			out = append(out, discord.ActionRow(kept...))
+		}
+	}
+	return out
+}
+
 // lastMondayTen is the most recent Monday 10:00 UTC at or before now.
 func lastMondayTen(now time.Time) time.Time {
 	now = now.UTC()
@@ -264,14 +283,16 @@ func lastMondayTen(now time.Time) time.Time {
 }
 
 // post sends a message through a feed's webhook, dropping the feed if the
-// webhook was deleted in Discord.
+// webhook was deleted in Discord. Only link buttons are kept: scheduled posts
+// don't need buttons that call back into the app.
 func (b *Bot) post(ctx context.Context, f store.Feed, data discord.ResponseData) error {
 	msg := discord.WebhookMessage{
 		Username:        b.AppName,
 		AvatarURL:       b.AvatarURL,
 		Content:         data.Content,
 		Embeds:          data.Embeds,
-		Components:      data.Components,
+		Components:      linkButtonsOnly(data.Components),
+		Flags:           data.Flags & discord.FlagComponentsV2,
 		AllowedMentions: discord.NoPings(),
 	}
 	err := b.Discord.ExecuteWebhook(ctx, discord.Webhook{ID: f.WebhookID, Token: f.WebhookToken}, msg)

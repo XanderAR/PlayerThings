@@ -14,8 +14,58 @@ func Commands() []discord.Command {
 	friend := func(name string, required bool) discord.CommandOption {
 		return discord.CommandOption{Type: discord.OptionUser, Name: name, Description: "Someone to compare with", Required: required}
 	}
+	player := discord.CommandOption{Type: discord.OptionUser, Name: "player", Description: "Whose (leave empty for yours)"}
 
 	return []discord.Command{
+		{
+			Name: "help", Description: "What this app can do",
+			IntegrationTypes: anyInstall, Contexts: everywhere,
+		},
+		{
+			Name: "game", Description: "A game's card: your hours, who here plays it, how popular it is",
+			Options: []discord.CommandOption{
+				{Type: discord.OptionString, Name: "game", Description: "Start typing a game name", Required: true, Autocomplete: true},
+			},
+			IntegrationTypes: anyInstall, Contexts: everywhere,
+		},
+		{
+			Name: "iceberg", Description: "Your most-played games, from mainstream hits to deep cuts",
+			Options:          []discord.CommandOption{player},
+			IntegrationTypes: anyInstall, Contexts: everywhere,
+		},
+		{
+			Name: "collage", Description: "Your top games in one grid",
+			Options: []discord.CommandOption{
+				player,
+				{Type: discord.OptionString, Name: "period", Description: "All time or the last two weeks", Choices: []discord.Choice{
+					{Name: "All time", Value: "all"},
+					{Name: "Last 2 weeks", Value: "recent"},
+				}},
+			},
+			IntegrationTypes: anyInstall, Contexts: everywhere,
+		},
+		{
+			Name: "crowns", Description: "Games where you have the most hours in this server",
+			Options:          []discord.CommandOption{player},
+			IntegrationTypes: anyInstall, Contexts: serversOnly,
+		},
+		{
+			Name: "leaderboard", Description: "This server's top players by hours, games or crowns",
+			Options: []discord.CommandOption{
+				{Type: discord.OptionString, Name: "type", Description: "What to rank by", Choices: []discord.Choice{
+					{Name: "Hours played", Value: "hours"},
+					{Name: "Last 2 weeks", Value: "recent"},
+					{Name: "Games played", Value: "games"},
+					{Name: "Crowns", Value: "crowns"},
+				}},
+			},
+			IntegrationTypes: anyInstall, Contexts: serversOnly,
+		},
+		{
+			Name: "taste", Description: "How your gaming taste compares with a friend's",
+			Options:          []discord.CommandOption{{Type: discord.OptionUser, Name: "friend", Description: "Who to compare with", Required: true}},
+			IntegrationTypes: anyInstall, Contexts: serversOnly,
+		},
 		{
 			Name: "link", Description: "Link your gaming accounts so your games follow you into every server",
 			IntegrationTypes: anyInstall, Contexts: everywhere,

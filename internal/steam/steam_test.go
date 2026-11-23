@@ -76,7 +76,9 @@ func TestNoKeySkipsWebAPI(t *testing.T) {
 }
 
 func TestBudget(t *testing.T) {
-	c := testClient(t, func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(`{"response":{"players":[{"steamid":"1"}]}}`)) })
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"response":{"players":[{"steamid":"1"}]}}`))
+	})
 	c.budget = NewBudget(1)
 	if _, err := c.PlayerSummary(context.Background(), "1"); err != nil {
 		t.Fatal(err)
@@ -99,6 +101,46 @@ func TestIsMultiplayer(t *testing.T) {
 		mp, known, err := c.IsMultiplayer(context.Background(), id)
 		if err != nil || mp != w[0] || known != w[1] {
 			t.Errorf("app %s: mp=%v known=%v err=%v, want %v", id, mp, known, err, w)
+		}
+	}
+}
+
+func TestGameDetails(t *testing.T) {
+	var gotFilters, gotLang string
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		gotFilters, gotLang = r.URL.Query().Get("filters"), r.URL.Query().Get("l")
+		w.Write([]byte(`{"548430":{"success":true,"data":{
+			"categories":[{"id":2},{"id":38}],
+			"genres":[{"id":"1","description":"Action"},{"id":"23","description":"Indie"}],
+			"recommendations":{"total":304804},
+			"release_date":{"coming_soon":false,"date":"13 May, 2020"}}}}`))
+	})
+	d, known, err := c.GameDetails(context.Background(), "548430")
+	if err != nil || !known {
+		t.Fatalf("known=%v err=%v", known, err)
+	}
+	if !d.Multiplayer || d.Reviews != 304804 || d.ReleaseYear != 2020 || strings.Join(d.Genres, ",") != "Action,Indie" {
+		t.Fatalf("details = %+v", d)
+	}
+	if gotFilters != "categories,genres,recommendations,release_date" || gotLang != "english" {
+		t.Fatalf("filters=%q l=%q", gotFilters, gotLang)
+	}
+}
+
+func TestReleaseYear(t *testing.T) {
+	cases := map[string]int{
+		"13 May, 2020":                   2020,
+		"May 13, 2020":                   2020,
+		"Q1 2027":                        2027,
+		"2026":                           2026,
+		"Coming soon":                    0,
+		"":                               0,
+		"To be announced (planned 1999)": 1999,
+		"Build 31337, 2024":              2024,
+	}
+	for in, want := range cases {
+		if got := releaseYear(in); got != want {
+			t.Errorf("releaseYear(%q) = %d, want %d", in, got, want)
 		}
 	}
 }

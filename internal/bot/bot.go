@@ -114,6 +114,20 @@ func (b *Bot) command(ctx context.Context, in *discord.Interaction) discord.Resp
 		return b.cmdVisibility(ctx, in)
 	case "unlink":
 		return b.cmdUnlink(ctx, in)
+	case "game":
+		return b.cmdGame(ctx, in)
+	case "iceberg":
+		return b.cmdIceberg(ctx, in)
+	case "collage":
+		return b.cmdCollage(ctx, in)
+	case "crowns":
+		return b.cmdCrowns(ctx, in)
+	case "leaderboard":
+		return b.cmdLeaderboard(ctx, in)
+	case "taste":
+		return b.cmdTaste(ctx, in)
+	case "help":
+		return b.cmdHelp(ctx, in)
 	}
 	return reply("I don't know that command yet.", true)
 }
@@ -185,10 +199,12 @@ func message(data discord.ResponseData) discord.Response {
 	return discord.Response{Type: discord.ResponseMessage, Data: &data}
 }
 
-// update edits the message a button was clicked on.
+// update edits the message a button was clicked on. Whether it's ephemeral
+// can't change, so that flag is dropped.
 func update(data discord.ResponseData) discord.Response {
 	if data.AllowedMentions == nil {
 		data.AllowedMentions = discord.NoPings()
 	}
+	data.Flags &^= discord.FlagEphemeral
 	return discord.Response{Type: discord.ResponseUpdateMessage, Data: &data}
 }

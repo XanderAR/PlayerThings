@@ -31,17 +31,22 @@ type Provider interface {
 	Fetch(ctx context.Context, externalID string) (Result, error)
 }
 
-// MultiplayerChecker looks up whether a Steam game supports online play.
-type MultiplayerChecker interface {
-	IsMultiplayer(ctx context.Context, appID string) (multiplayer, known bool, err error)
+// DetailsChecker looks up a Steam game's store details: multiplayer support,
+// genres, review count and release year.
+type DetailsChecker interface {
+	GameDetails(ctx context.Context, appID string) (steam.Details, bool, error)
 }
+
+// detailsPerTick caps store lookups per minute. The store client spaces calls
+// about 1.6 s apart, so this fits in a tick and stays under the store's limits.
+const detailsPerTick = 25
 
 // Syncer refreshes libraries in the background.
 type Syncer struct {
 	Store     *store.Store
 	Providers map[string]Provider
-	Checker   MultiplayerChecker // optional
-	Interval  time.Duration      // how stale an account may get
+	Checker   DetailsChecker // optional
+	Interval  time.Duration  // how stale an account may get
 	Log       *slog.Logger
 	Now       func() time.Time
 
@@ -87,27 +92,30 @@ func (s *Syncer) SyncSoon(discordID, platform string) {
 	}()
 }
 
-// CheckGame looks up and stores a Steam game's multiplayer tag.
+// CheckGame looks up and stores a Steam game's details, and returns its
+// multiplayer tag (nil when the store has no page for it).
 func (s *Syncer) CheckGame(ctx context.Context, appID string) (*bool, error) {
 	if s.Checker == nil {
 		return nil, nil
 	}
-	mp, known, err := s.Checker.IsMultiplayer(ctx, appID)
+	d, known, err := s.Checker.GameDetails(ctx, appID)
 	if err != nil {
 		return nil, err
 	}
-	var v *bool
+	var gd store.GameDetails
 	if known {
-		v = &mp
+		mp := d.Multiplayer
+		gd = store.GameDetails{Multiplayer: &mp, Genres: d.Genres, Reviews: d.Reviews, ReleaseYear: d.ReleaseYear}
 	}
-	return v, s.Store.SetMultiplayer(ctx, "steam", appID, v, s.now())
+	// Unknown games are stored with empty details so they aren't retried forever.
+	return gd.Multiplayer, s.Store.SetGameDetails(ctx, "steam", appID, gd, s.now())
 }
 
 // retryFailedAfter is how long a failed sync waits before it's tried again,
 // instead of waiting the full sync interval.
 const retryFailedAfter = 10 * time.Minute
 
-// Run syncs stale accounts and fills in multiplayer tags until ctx ends.
+// Run syncs stale accounts and fills in game details until ctx ends.
 func (s *Syncer) Run(ctx context.Context) {
 	t := time.NewTicker(time.Minute)
 	defer t.Stop()
@@ -150,9 +158,9 @@ func (s *Syncer) tick(ctx context.Context) {
 	if s.Checker == nil {
 		return
 	}
-	ids, err := s.Store.UncheckedGames(ctx, "steam", 5)
+	ids, err := s.Store.UndetailedGames(ctx, "steam", detailsPerTick)
 	if err != nil {
-		s.log().Error("list unchecked games", "err", err)
+		s.log().Error("list games without details", "err", err)
 		return
 	}
 	for _, id := range ids {
@@ -160,7 +168,8 @@ func (s *Syncer) tick(ctx context.Context) {
 			return
 		}
 		if _, err := s.CheckGame(ctx, id); err != nil {
-			s.log().Warn("multiplayer lookup failed", "app", id, "err", err)
+			// Likely the store rate limit; try the rest next tick.
+			s.log().Warn("game details lookup failed; pausing until next tick", "app", id, "err", err)
 			return
 		}
 	}

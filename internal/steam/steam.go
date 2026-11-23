@@ -128,48 +128,98 @@ var multiplayerCategories = map[int]bool{
 	49: true, // PvP
 }
 
-// IsMultiplayer looks up a game's store categories. known is false when the
-// store has no page for the app (removed, region-locked, or not a game).
-func (c *Client) IsMultiplayer(ctx context.Context, appID string) (multiplayer, known bool, err error) {
+// Details is store data about a game, from one appdetails call.
+type Details struct {
+	Multiplayer bool
+	Genres      []string
+	Reviews     int // Steam "recommendations" total; 0 when the store shows none
+	ReleaseYear int // 0 when unknown or not released yet
+}
+
+// GameDetails looks up a game's store categories, genres, review count and
+// release year. known is false when the store has no page for the app
+// (removed, region-locked, or not a game).
+func (c *Client) GameDetails(ctx context.Context, appID string) (Details, bool, error) {
 	if err := c.store.Wait(ctx); err != nil {
-		return false, false, err
+		return Details{}, false, err
 	}
 	q := url.Values{}
 	q.Set("appids", appID)
-	q.Set("filters", "categories")
+	q.Set("filters", "categories,genres,recommendations,release_date")
+	q.Set("l", "english")
 	raw, err := c.get(ctx, c.StoreBase+"/api/appdetails?"+q.Encode())
 	if err != nil {
-		return false, false, err
+		return Details{}, false, err
 	}
 	var body map[string]struct {
 		Success bool            `json:"success"`
 		Data    json.RawMessage `json:"data"`
 	}
 	if err := json.Unmarshal(raw, &body); err != nil {
-		return false, false, fmt.Errorf("decode appdetails: %w", err)
+		return Details{}, false, fmt.Errorf("decode appdetails: %w", err)
 	}
 	entry, ok := body[appID]
 	if !ok || !entry.Success {
-		return false, false, nil
+		return Details{}, false, nil
 	}
-	// With a filter and no matching data the store returns "data": [].
+	// With filters and no matching data the store returns "data": [].
 	if len(entry.Data) == 0 || entry.Data[0] != '{' {
-		return false, true, nil
+		return Details{}, true, nil
 	}
 	var data struct {
 		Categories []struct {
 			ID int `json:"id"`
 		} `json:"categories"`
+		Genres []struct {
+			Description string `json:"description"`
+		} `json:"genres"`
+		Recommendations struct {
+			Total int `json:"total"`
+		} `json:"recommendations"`
+		ReleaseDate struct {
+			Date string `json:"date"`
+		} `json:"release_date"`
 	}
 	if err := json.Unmarshal(entry.Data, &data); err != nil {
-		return false, false, fmt.Errorf("decode categories: %w", err)
+		return Details{}, false, fmt.Errorf("decode appdetails data: %w", err)
 	}
+	d := Details{Reviews: data.Recommendations.Total, ReleaseYear: releaseYear(data.ReleaseDate.Date)}
 	for _, cat := range data.Categories {
 		if multiplayerCategories[cat.ID] {
-			return true, true, nil
+			d.Multiplayer = true
+			break
 		}
 	}
-	return false, true, nil
+	for _, g := range data.Genres {
+		if name := strings.TrimSpace(g.Description); name != "" {
+			d.Genres = append(d.Genres, name)
+		}
+	}
+	return d, true, nil
+}
+
+// IsMultiplayer reports whether a game supports online play. known is false
+// when the store has no page for the app.
+func (c *Client) IsMultiplayer(ctx context.Context, appID string) (multiplayer, known bool, err error) {
+	d, known, err := c.GameDetails(ctx, appID)
+	return d.Multiplayer, known, err
+}
+
+var yearPattern = regexp.MustCompile(`\b(19[89]\d|20\d\d|2100)\b`)
+
+// releaseYear pulls the year out of a store release date, whose format varies
+// by game and language ("13 May, 2020", "May 13, 2020", "Q1 2027"). It
+// returns 0 for dates without a year, such as "Coming soon".
+func releaseYear(date string) int {
+	years := yearPattern.FindAllString(date, -1)
+	if len(years) == 0 {
+		return 0
+	}
+	y, err := strconv.Atoi(years[len(years)-1])
+	if err != nil {
+		return 0
+	}
+	return y
 }
 
 func (c *Client) apiGet(ctx context.Context, path string, q url.Values, out any) error {

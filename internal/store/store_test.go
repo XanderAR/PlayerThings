@@ -20,8 +20,8 @@ func openTest(t *testing.T) *Store {
 }
 
 type owned struct {
-	id, name        string
-	total, recent   int
+	id, name      string
+	total, recent int
 }
 
 func seedUser(t *testing.T, s *Store, discordID, steamID string, games ...owned) {

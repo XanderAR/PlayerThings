@@ -40,6 +40,10 @@ CREATE TABLE IF NOT EXISTS games (
 	store_url   TEXT NOT NULL DEFAULT '',
 	multiplayer INTEGER,
 	checked_at  INTEGER NOT NULL DEFAULT 0,
+	genres       TEXT NOT NULL DEFAULT '',
+	reviews      INTEGER NOT NULL DEFAULT 0,
+	release_year INTEGER NOT NULL DEFAULT 0,
+	details_at   INTEGER NOT NULL DEFAULT 0,
 	PRIMARY KEY (platform, game_id)
 );
 
@@ -103,6 +107,10 @@ type Game struct {
 	StoreURL    string
 	Multiplayer *bool // nil until checked
 	CheckedAt   time.Time
+	Genres      []string  // from the store; nil until looked up
+	Reviews     int       // Steam recommendations total, a rough popularity measure
+	ReleaseYear int       // 0 when unknown
+	DetailsAt   time.Time // zero until genres, reviews and release year are looked up
 }
 
 // LibraryEntry is one game in a user's synced library.
@@ -172,7 +180,51 @@ func Open(path string) (*Store, error) {
 			return nil, fmt.Errorf("create schema: %w", err)
 		}
 	}
+	if err := migrate(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("migrate: %w", err)
+	}
 	return &Store{db: db}, nil
+}
+
+// addedColumns are columns added after the first release. CREATE TABLE IF
+// NOT EXISTS leaves existing tables alone, so older databases get them here.
+var addedColumns = []struct{ table, column, def string }{
+	{"games", "genres", "TEXT NOT NULL DEFAULT ''"},
+	{"games", "reviews", "INTEGER NOT NULL DEFAULT 0"},
+	{"games", "release_year", "INTEGER NOT NULL DEFAULT 0"},
+	{"games", "details_at", "INTEGER NOT NULL DEFAULT 0"},
+}
+
+func migrate(db *sql.DB) error {
+	have := map[string]bool{}
+	for _, table := range []string{"games"} {
+		rows, err := db.Query(`SELECT name FROM pragma_table_info(?)`, table)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var name string
+			if err := rows.Scan(&name); err != nil {
+				rows.Close()
+				return err
+			}
+			have[table+"."+name] = true
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+	}
+	for _, c := range addedColumns {
+		if have[c.table+"."+c.column] {
+			continue
+		}
+		if _, err := db.Exec(`ALTER TABLE ` + c.table + ` ADD COLUMN ` + c.column + ` ` + c.def); err != nil {
+			return fmt.Errorf("add %s.%s: %w", c.table, c.column, err)
+		}
+	}
+	return nil
 }
 
 // Close closes the database.
@@ -596,7 +648,8 @@ func (s *Store) HasData(ctx context.Context, discordID string) (bool, error) {
 	return n > 0, err
 }
 
-const gameColumns = `g.platform, g.game_id, g.name, g.image_url, g.store_url, g.multiplayer, g.checked_at`
+const gameColumns = `g.platform, g.game_id, g.name, g.image_url, g.store_url, g.multiplayer, g.checked_at,
+	g.genres, g.reviews, g.release_year, g.details_at`
 
 type scanner interface {
 	Scan(dest ...any) error
@@ -604,8 +657,10 @@ type scanner interface {
 
 func scanGame(sc scanner, g *Game, extra ...any) error {
 	var mp sql.NullInt64
-	var checked int64
-	dest := append([]any{&g.Platform, &g.GameID, &g.Name, &g.ImageURL, &g.StoreURL, &mp, &checked}, extra...)
+	var checked, detailed int64
+	var genres string
+	dest := append([]any{&g.Platform, &g.GameID, &g.Name, &g.ImageURL, &g.StoreURL, &mp, &checked,
+		&genres, &g.Reviews, &g.ReleaseYear, &detailed}, extra...)
 	if err := sc.Scan(dest...); err != nil {
 		return err
 	}
@@ -614,7 +669,26 @@ func scanGame(sc scanner, g *Game, extra ...any) error {
 		g.Multiplayer = &b
 	}
 	g.CheckedAt = fromUnix(checked)
+	g.Genres = splitGenres(genres)
+	g.DetailsAt = fromUnix(detailed)
 	return nil
+}
+
+func splitGenres(s string) []string {
+	if s == "" {
+		return nil
+	}
+	return strings.Split(s, ",")
+}
+
+func joinGenres(genres []string) string {
+	clean := make([]string, 0, len(genres))
+	for _, g := range genres {
+		if g = strings.TrimSpace(strings.ReplaceAll(g, ",", " ")); g != "" {
+			clean = append(clean, g)
+		}
+	}
+	return strings.Join(clean, ",")
 }
 
 func scanAccount(sc scanner) (Account, error) {

@@ -68,6 +68,7 @@ type WebhookMessage struct {
 	Content         string           `json:"content,omitempty"`
 	Embeds          []Embed          `json:"embeds,omitempty"`
 	Components      []Component      `json:"components,omitempty"`
+	Flags           int              `json:"flags,omitempty"`
 	AllowedMentions *AllowedMentions `json:"allowed_mentions,omitempty"`
 }
 
@@ -93,7 +94,8 @@ func (c *Client) RegisterCommands(ctx context.Context, guildID string, cmds []Co
 // tokens authorize this call, so no bot token is sent.
 func (c *Client) EditOriginal(ctx context.Context, interactionToken string, data ResponseData) error {
 	path := fmt.Sprintf("/webhooks/%s/%s/messages/@original", c.AppID, interactionToken)
-	data.Flags = 0 // flags are fixed by the deferred response
+	// Ephemerality is fixed by the deferred response; only the layout flag can be set here.
+	data.Flags &= FlagComponentsV2
 	return c.do(ctx, http.MethodPatch, path, false, data, nil)
 }
 
@@ -122,6 +124,16 @@ func (c *Client) DeleteWebhook(ctx context.Context, w Webhook) error {
 		return &APIError{Status: resp.StatusCode, Message: resp.Status}
 	}
 	return nil
+}
+
+// CreateMessage posts a message in a channel as the bot. Only the layout
+// flag is kept (bot messages can't be ephemeral).
+func (c *Client) CreateMessage(ctx context.Context, channelID string, data ResponseData) error {
+	data.Flags &= FlagComponentsV2
+	if data.AllowedMentions == nil {
+		data.AllowedMentions = NoPings()
+	}
+	return c.do(ctx, http.MethodPost, "/channels/"+channelID+"/messages", true, data, nil)
 }
 
 // ExecuteWebhook posts a message through a webhook the app created.
@@ -161,6 +173,9 @@ func (c *Client) do(ctx context.Context, method, path string, auth bool, body, o
 		apiErr := &APIError{Status: resp.StatusCode}
 		if json.Unmarshal(raw, apiErr) != nil || apiErr.Message == "" {
 			apiErr.Message = string(raw)
+		} else if resp.StatusCode == http.StatusBadRequest {
+			// Keep Discord's field-by-field details: they say which component is wrong.
+			apiErr.Message += " " + Truncate(string(raw), 1500)
 		}
 		return apiErr
 	}
