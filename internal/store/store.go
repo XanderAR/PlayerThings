@@ -530,7 +530,8 @@ func (s *Store) Game(ctx context.Context, platform, gameID string) (Game, bool, 
 }
 
 // SearchServerGames finds games owned by a server's opted-in members whose
-// name contains query, most widely owned first. Used for autocomplete.
+// name contains query: names starting with it first, then names with a word
+// starting with it, each most widely owned first. Used for autocomplete.
 func (s *Store) SearchServerGames(ctx context.Context, guildID, platform, query string, limit int) ([]GameMatch, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT `+gameColumns+`, COUNT(*) AS owners
@@ -539,7 +540,9 @@ func (s *Store) SearchServerGames(ctx context.Context, guildID, platform, query 
 		JOIN games g ON g.platform = l.platform AND g.game_id = l.game_id
 		WHERE v.guild_id = ? AND v.visible = 1 AND g.name LIKE ? ESCAPE '\'
 		GROUP BY g.platform, g.game_id
-		ORDER BY owners DESC, g.name LIMIT ?`, platform, guildID, likePattern(query), limit)
+		ORDER BY CASE WHEN g.name LIKE ? ESCAPE '\' THEN 0 WHEN g.name LIKE ? ESCAPE '\' THEN 1 ELSE 2 END,
+		         owners DESC, g.name LIMIT ?`,
+		platform, guildID, likePattern(query), prefixPattern(query), wordPattern(query), limit)
 	if err != nil {
 		return nil, err
 	}
@@ -789,6 +792,11 @@ func (s *Store) tx(ctx context.Context, fn func(*sql.Tx) error) error {
 	}
 	return tx.Commit()
 }
+
+// prefixPattern and wordPattern match names that start with q, or have a
+// word that does: typing "raft" should offer Raft before Minecraft.
+func prefixPattern(q string) string { return strings.TrimPrefix(likePattern(q), "%") }
+func wordPattern(q string) string   { return "% " + prefixPattern(q) }
 
 func likePattern(q string) string {
 	r := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)

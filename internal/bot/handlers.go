@@ -427,14 +427,23 @@ func (b *Bot) searchOwnGames(ctx context.Context, discordID, query string, limit
 		return nil
 	}
 	query = strings.ToLower(strings.TrimSpace(query))
-	var out []store.PlayedGame
+	// Names starting with the text first, then a word starting with it, then
+	// any match; most played first within each.
+	var tiers [3][]store.PlayedGame
 	for _, g := range games {
-		if query == "" || strings.Contains(strings.ToLower(g.Name), query) {
-			out = append(out, g)
-			if len(out) == limit {
-				break
-			}
+		name := strings.ToLower(g.Name)
+		switch {
+		case query == "" || strings.HasPrefix(name, query):
+			tiers[0] = append(tiers[0], g)
+		case strings.Contains(name, " "+query):
+			tiers[1] = append(tiers[1], g)
+		case strings.Contains(name, query):
+			tiers[2] = append(tiers[2], g)
 		}
+	}
+	out := append(append(tiers[0], tiers[1]...), tiers[2]...)
+	if len(out) > limit {
+		out = out[:limit]
 	}
 	return out
 }

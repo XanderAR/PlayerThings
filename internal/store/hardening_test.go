@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -119,5 +120,31 @@ func TestIsSoftware(t *testing.T) {
 		if got := IsSoftware(splitGenres(genres)); got != want {
 			t.Errorf("%s: got %v", genres, got)
 		}
+	}
+}
+
+// Typing "raft" offers Raft before Minecraft Dungeons, even when Minecraft is
+// more widely owned, and "rock" finds Deep Rock by its second word.
+func TestSearchRanksNameStartsFirst(t *testing.T) {
+	s := openTest(t)
+	ctx := context.Background()
+	seedUser(t, s, "100", "s100", owned{"1", "Minecraft Dungeons", 60, 0}, owned{"2", "Raft", 60, 0}, owned{"3", "Deep Rock Galactic", 60, 0}, owned{"4", "Rocket League", 60, 0})
+	seedUser(t, s, "200", "s200", owned{"1", "Minecraft Dungeons", 60, 0})
+	for _, id := range []string{"100", "200"} {
+		s.SetVisibility(ctx, "G", id, true, t0)
+	}
+	got := func(q string) string {
+		m, _ := s.SearchServerGames(ctx, "G", "steam", q, 10)
+		var names []string
+		for _, g := range m {
+			names = append(names, g.Name)
+		}
+		return strings.Join(names, ", ")
+	}
+	if g := got("raft"); g != "Raft, Minecraft Dungeons" {
+		t.Errorf("raft = %s", g)
+	}
+	if g := got("rock"); g != "Rocket League, Deep Rock Galactic" {
+		t.Errorf("rock = %s", g)
 	}
 }
