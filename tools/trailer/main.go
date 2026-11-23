@@ -1,6 +1,6 @@
-// Command trailer renders a 30-second product trailer from the bot's real
-// card screenshots and cover images (the same assets as the top.gg page),
-// and encodes it with ffmpeg.
+// Command trailer renders a product trailer (about a minute) from the bot's
+// real card screenshots and cover images (the same assets as the top.gg page),
+// with a synthesized soundtrack, and encodes it with ffmpeg.
 //
 //	go run ./tools/trailer -out trailer/playergg-trailer.mp4
 //	go run ./tools/trailer -stills 1,4,6.5,10 -out trailer/   # PNG stills to review
@@ -38,7 +38,7 @@ import (
 const (
 	W, H  = 1920, 1080
 	fps   = 30
-	total = 30.0
+	total = 54.0
 )
 
 var (
@@ -55,11 +55,14 @@ var (
 	discDim  = color.NRGBA{0xb5, 0xba, 0xc1, 0xff}
 )
 
-type faces struct{ hook, caption, chip, title, tagline, small, bar, barBold, barSmall, button font.Face }
+type faces struct {
+	hook, caption, chip, title, tagline, small, bar, barBold, barSmall, button, studios font.Face
+}
 
 type assets struct {
-	verdict, four, profile, collage, backlog, goty, playtests, icon image.Image
-	covers                                                          []image.Image
+	verdict, four, profile, collage, iceberg, backlog, goty, collection, playtests, icon image.Image
+	logos                                                                                []image.Image
+	covers                                                                               []image.Image
 }
 
 type renderer struct {
@@ -75,7 +78,17 @@ func main() {
 	icon := flag.String("icon", "internal/web/static/icon.png", "app icon")
 	ffmpeg := flag.String("ffmpeg", "ffmpeg", "ffmpeg binary")
 	stills := flag.String("stills", "", "comma-separated seconds: write PNG stills instead of a video")
+	logoDir := flag.String("logos", "trailer/assets/logos", "folder of extracted studio logos")
+	extract := flag.String("extract-logos", "", "comma-separated capture pages: cut the studio logos out of them and exit")
+	logoNames := flag.String("logo-names", "", "comma-separated studio names, in capture order")
 	flag.Parse()
+
+	if *extract != "" {
+		if err := extractLogos(strings.Split(*extract, ","), strings.Split(*logoNames, ","), *logoDir); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 
 	r := &renderer{bg: background(), glow: glowSprite(900)}
 	var err error
@@ -83,6 +96,9 @@ func main() {
 		log.Fatal(err)
 	}
 	if r.f, err = loadFaces(); err != nil {
+		log.Fatal(err)
+	}
+	if r.a.logos, err = loadLogos(*logoDir); err != nil {
 		log.Fatal(err)
 	}
 	frame := image.NewRGBA(image.Rect(0, 0, W, H))
@@ -100,9 +116,15 @@ func main() {
 	}
 
 	os.MkdirAll(filepath.Dir(*out), 0o755)
+	music := filepath.Join(filepath.Dir(*out), "soundtrack.wav")
+	if err := writeWAV(music, renderMusic(song{length: total, drop: 6, lift: 38, outro: 46})); err != nil {
+		log.Fatal(err)
+	}
 	cmd := exec.Command(*ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
 		"-f", "rawvideo", "-pix_fmt", "rgba", "-s", fmt.Sprintf("%dx%d", W, H), "-r", strconv.Itoa(fps), "-i", "-",
-		"-c:v", "libx264", "-preset", "slow", "-crf", "16", "-pix_fmt", "yuv420p", "-movflags", "+faststart", *out)
+		"-i", music, "-map", "0:v", "-map", "1:a",
+		"-c:v", "libx264", "-preset", "slow", "-crf", "16", "-pix_fmt", "yuv420p",
+		"-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart", *out)
 	cmd.Stderr = os.Stderr
 	in, err := cmd.StdinPipe()
 	if err != nil {
@@ -138,13 +160,17 @@ type beat struct {
 	command, cap string
 }
 
+// Scene cuts land every 4 s (two bars of the soundtrack); each beat starts
+// and ends 0.15 s either side of its cut so neighbours cross-fade.
 var beats = []beat{
-	{5.0, 8.6, func(a assets) image.Image { return a.verdict }, "/verdict", "Get roasted by your own Steam stats."},
-	{8.4, 12.0, func(a assets) image.Image { return a.four }, "/four", "Show off the four games that made you."},
-	{11.8, 15.4, nil, "/profile", "Your whole Steam library in one card."},
-	{15.2, 18.8, func(a assets) image.Image { return a.backlog }, "/backlog", "See the games you bought and never played."},
-	{18.6, 22.2, func(a assets) image.Image { return a.goty }, "/goty", "Your Game of the Year, ranked by your hours."},
-	{22.0, 25.6, func(a assets) image.Image { return a.playtests }, "/playtests", "Play new games before they're out."},
+	{5.85, 10.15, func(a assets) image.Image { return a.verdict }, "/verdict", "Get roasted by your own gaming stats."},
+	{9.85, 14.15, func(a assets) image.Image { return a.four }, "/four", "Show off the four games that made you."},
+	{13.85, 18.15, nil, "/profile", "Your whole game library in one card."},
+	{17.85, 22.15, func(a assets) image.Image { return a.iceberg }, "/iceberg", "Find out how deep your taste goes."},
+	{21.85, 26.15, func(a assets) image.Image { return a.backlog }, "/backlog", "See the games you bought and never played."},
+	{25.85, 30.15, func(a assets) image.Image { return a.goty }, "/goty", "Your Game of the Year, ranked by your hours."},
+	{29.85, 34.15, func(a assets) image.Image { return a.collection }, "/collection", "See how much of the classics you've played."},
+	{33.85, 38.15, func(a assets) image.Image { return a.playtests }, "/playtests", "Play new games before they're out."},
 }
 
 func (r *renderer) draw(dst *image.RGBA, t float64) {
@@ -153,19 +179,22 @@ func (r *renderer) draw(dst *image.RGBA, t float64) {
 	gy := 420 + 140*math.Cos(t*0.27)
 	draw.Draw(dst, r.glow.Bounds().Add(image.Pt(int(gx)-r.glow.Bounds().Dx()/2, int(gy)-r.glow.Bounds().Dy()/2)), r.glow, image.Point{}, draw.Over)
 
-	if t < 2.9 {
+	if t < 4.1 {
 		r.hook(dst, t)
 	}
-	if t >= 2.6 && t < 5.3 {
-		r.composer(dst, t-2.6)
+	if t >= 3.8 && t < 6.5 {
+		r.composer(dst, t-3.8)
 	}
 	for _, b := range beats {
 		if t >= b.start && t < b.end {
 			r.beat(dst, b, t-b.start, b.end-b.start)
 		}
 	}
-	if t >= 25.4 {
-		r.endCard(dst, t-25.4)
+	if t >= 37.85 && t < 46.2 {
+		r.studios(dst, t-37.85, 46.2-37.85)
+	}
+	if t >= 45.9 {
+		r.endCard(dst, t-45.9)
 	}
 	// Fade in from black at the start and out at the end.
 	if t < 0.35 {
@@ -191,10 +220,10 @@ func presence(local, dur, in, out float64) float64 {
 // ----- scenes -----
 
 func (r *renderer) hook(dst *image.RGBA, t float64) {
-	alpha := presence(t, 2.9, 0.3, 0.35)
-	line1, line2 := "What does your Steam library", "say about you?"
+	alpha := presence(t, 4.1, 0.3, 0.4)
+	line1, line2 := "What does your game library", "say about you?"
 	full := line1 + "\n" + line2
-	shown := int(clamp((t-0.25)/1.4) * float64(len([]rune(full))))
+	shown := int(clamp((t-0.3)/1.7) * float64(len([]rune(full))))
 	typed := string([]rune(full)[:shown])
 	a, b, _ := strings.Cut(typed, "\n")
 	y1, y2 := 470, 590
@@ -268,9 +297,9 @@ func (r *renderer) beat(dst *image.RGBA, b beat, local, dur float64) {
 		bw, bh := float64(img.Bounds().Dx()), float64(img.Bounds().Dy())
 		if bh/bw > 1.05 {
 			// Tall cards: show them bigger and pan slowly down them.
-			scale := math.Min(1.5, 1100/bw)
+			scale := math.Min(1.9, 900/bw) // narrow cards get bigger
 			h := bh * scale
-			p := smooth(clamp((local - 0.35) / (dur - 0.8)))
+			p := smooth(clamp((local - 0.7) / (dur - 1.1))) // hold on the title first
 			from, to := 40+h/2, 925-h/2
 			r.card(dst, img, W/2, from+(to-from)*p+dy, scale, alpha)
 		} else {
@@ -301,7 +330,7 @@ func (r *renderer) endCard(dst *image.RGBA, t float64) {
 	x0 := W/2 - total/2
 	place(dst, r.a.icon, float64(x0)+iconSize/2, 606-(1-ta)*20, iconSize/float64(r.a.icon.Bounds().Dx()), ta)
 	text(dst, r.f.title, name, x0+int(iconSize)+28, 650-int((1-ta)*20), white, ta)
-	tg := "Your games, your server, your verdict."
+	tg := "Discover, test, and review games."
 	text(dst, r.f.tagline, tg, W/2-font.MeasureString(r.f.tagline, tg).Ceil()/2, 734, soft, in(0.7))
 	// Add to Discord.
 	ba := in(0.95)
@@ -311,8 +340,53 @@ func (r *renderer) endCard(dst *image.RGBA, t float64) {
 	fillRound(dst, btn, 14, blurple, ba)
 	label := "ADD TO DISCORD"
 	text(dst, r.f.button, label, W/2-font.MeasureString(r.f.button, label).Ceil()/2, 843, white, ba)
-	small := "Free on Discord  ·  Link Steam once, use it everywhere"
+	small := "Free on Discord  ·  Play games early with player.gg playtests"
 	text(dst, r.f.small, small, W/2-font.MeasureString(r.f.small, small).Ceil()/2, 938, muted, in(1.2))
+}
+
+// studios is FirstLook's logo wall: the studios that trust the platform behind
+// player.gg's playtests, building in tile by tile.
+func (r *renderer) studios(dst *image.RGBA, t, dur float64) {
+	alpha := presence(t, dur, 0.4, 0.35)
+	in := func(at float64) float64 { return ease(clamp((t - at) / 0.45)) }
+	// "Trusted by 1,000+ studios", with the number in the accent colour.
+	parts := []struct {
+		s string
+		c color.NRGBA
+	}{{"Trusted by ", white}, {"1,000+", accent}, {" studios", white}}
+	tw := 0
+	for _, p := range parts {
+		tw += font.MeasureString(r.f.studios, p.s).Ceil()
+	}
+	x := W/2 - tw/2
+	ta := alpha * in(0.1)
+	for _, p := range parts {
+		text(dst, r.f.studios, p.s, x, 205-int((1-in(0.1))*24), p.c, ta)
+		x += font.MeasureString(r.f.studios, p.s).Ceil()
+	}
+	sub := "Studios on FirstLook find their playtesters on player.gg"
+	text(dst, r.f.tagline, sub, W/2-font.MeasureString(r.f.tagline, sub).Ceil()/2, 278, soft, alpha*in(0.35))
+
+	const cols, tileW, tileH, gapX, gapY = 8, 200, 126, 14, 16
+	rows := (len(r.a.logos) + cols - 1) / cols
+	for i, logo := range r.a.logos {
+		row, col := i/cols, i%cols
+		inRow := cols
+		if row == rows-1 && len(r.a.logos)%cols != 0 {
+			inRow = len(r.a.logos) % cols
+		}
+		rowW := inRow*tileW + (inRow-1)*gapX
+		x0 := W/2 - rowW/2 + col*(tileW+gapX)
+		y0 := 330 + row*(tileH+gapY)
+		a := alpha * in(0.55+float64(i)*0.045)
+		lift := int((1 - in(0.55+float64(i)*0.045)) * 22)
+		tile := image.Rect(x0, y0+lift, x0+tileW, y0+tileH+lift)
+		fillRound(dst, tile, 16, color.NRGBA{0xff, 0xff, 0xff, 0xff}, a*0.055)
+		b := logo.Bounds()
+		scale := math.Min(168/float64(b.Dx()), 84/float64(b.Dy()))
+		place(dst, logo, float64(x0+tileW/2), float64(y0+tileH/2+lift), scale, a)
+	}
+	r.caption(dst, "", "Join playtests before games launch.", alpha*in(3.0))
 }
 
 // card draws an image with a soft shadow, centred on (cx, cy).
@@ -343,9 +417,16 @@ func (r *renderer) caption(dst *image.RGBA, command, s string, alpha float64) {
 	tw := font.MeasureString(r.f.caption, s).Ceil()
 	pad := 22
 	total := cw + 18 + tw + 2*pad
+	if command == "" {
+		total = tw + 2*pad + 12
+	}
 	x0 := W/2 - total/2
 	box := image.Rect(x0, 948, x0+total, 1036)
 	fillRound(dst, box, 18, color.NRGBA{0x0b, 0x0a, 0x12, 0xff}, alpha*0.88)
+	if command == "" {
+		text(dst, r.f.caption, s, x0+pad+6, 1006, white, alpha)
+		return
+	}
 	chip := image.Rect(x0+pad, 966, x0+pad+cw, 1018)
 	fillRound(dst, chip, 26, chipBG, alpha)
 	text(dst, r.f.chip, command, chip.Min.X+18, 1002, color.NRGBA{0xee, 0xea, 0xff, 0xff}, alpha)
@@ -482,6 +563,7 @@ func loadAssets(media, iconPath string) (assets, error) {
 		return img
 	}
 	a.verdict, a.four, a.profile = load("card-verdict.png"), load("shelf-four.jpg"), load("card-profile.png")
+	a.iceberg, a.collection = load("card-iceberg.png"), load("shelf-collection.jpg")
 	a.collage, a.backlog, a.goty = load("shelf-collage.jpg"), load("card-backlog.png"), load("card-goty.png")
 	a.playtests = load("card-playtests.png")
 	if err != nil {
@@ -558,5 +640,6 @@ func loadFaces() (faces, error) {
 	f.barBold = face("segoeuib.ttf", 34)
 	f.barSmall = face("segoeui.ttf", 26)
 	f.button = face("segoeuib.ttf", 38)
+	f.studios = face("seguibl.ttf", 92)
 	return f, err
 }

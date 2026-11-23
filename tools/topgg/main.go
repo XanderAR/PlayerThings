@@ -54,7 +54,7 @@ func main() {
 	bannerName := flag.String("banner", "banner.png", "banner file name")
 	footer := flag.String("footer", "Steam stats, playtests and server leaderboards  ·  Unofficial, built for player.gg", "banner footer line")
 	bannerOnly := flag.Bool("banner-only", false, "only draw the banner")
-	avatars := flag.String("avatars", "alex=alex-5,mara,theo", "placeholder avatars to write: name or name=seed")
+	avatars := flag.String("avatars", "alex=alex-5,mara,theo", "placeholder avatars to write: name or name=seed (none to skip)")
 	cardAvatar := flag.String("card-avatar", "alex-5", "seed of the avatar swapped into card screenshots")
 	list := shots{}
 	flag.Var(list, "shot", "card screenshot: name=path[@offset][,path@offset...] (repeatable)")
@@ -64,6 +64,9 @@ func main() {
 	}
 	// Placeholder profile pictures for the sample players.
 	for _, spec := range strings.Split(*avatars, ",") {
+		if spec == "none" || spec == "" {
+			continue
+		}
 		name, seed, ok := strings.Cut(spec, "=")
 		if !ok {
 			seed = name
@@ -92,14 +95,28 @@ func main() {
 // corners.
 func card(spec string, av image.Image) (image.Image, error) {
 	type slice struct {
-		img image.Image
-		off int
+		img      image.Image
+		off      int
+		from, to int // rows of the slice to use; to = 0 means all
 	}
 	var parts []slice
 	width, height := 0, 0
+	// ";top=N" starts the card at row N instead of at its first coloured
+	// border (for cards whose first rows aren't inside a container).
+	topOverride := -1
+	if s, t, ok := strings.Cut(spec, ";top="); ok {
+		spec = s
+		topOverride, _ = strconv.Atoi(t)
+	}
 	for _, p := range strings.Split(spec, ",") {
 		path, offStr, _ := strings.Cut(p, "@")
+		offStr, rows, _ := strings.Cut(offStr, "#") // "#from-to": only these rows
 		off, _ := strconv.Atoi(offStr)
+		from, to := 0, 0
+		if a, b, ok := strings.Cut(rows, "-"); ok {
+			from, _ = strconv.Atoi(a)
+			to, _ = strconv.Atoi(b)
+		}
 		f, err := os.Open(path)
 		if err != nil {
 			return nil, err
@@ -109,17 +126,21 @@ func card(spec string, av image.Image) (image.Image, error) {
 		if err != nil {
 			return nil, err
 		}
-		parts = append(parts, slice{img, off})
+		parts = append(parts, slice{img, off, from, to})
 		width = max(width, img.Bounds().Dx())
 		height = max(height, off+img.Bounds().Dy())
 	}
 	full := image.NewRGBA(image.Rect(0, 0, width, height))
 	for _, s := range parts {
-		draw.Draw(full, image.Rect(0, s.off, width, s.off+s.img.Bounds().Dy()), s.img, s.img.Bounds().Min, draw.Src)
+		from, to := s.from, s.to
+		if to <= 0 || to > s.img.Bounds().Dy() {
+			to = s.img.Bounds().Dy()
+		}
+		draw.Draw(full, image.Rect(0, s.off+from, width, s.off+to), s.img, s.img.Bounds().Min.Add(image.Pt(0, from)), draw.Src)
 	}
 	swapAvatar(full, av)
 
-	bg := full.At(width-3, 3) // empty chat to the right of the label
+	bg := full.At(width-3, height-3) // empty chat beside the bottom row of buttons
 	differs := func(c color.Color, by int) bool {
 		r1, g1, b1, _ := c.RGBA()
 		r2, g2, b2, _ := bg.RGBA()
@@ -140,6 +161,9 @@ func card(spec string, av image.Image) (image.Image, error) {
 				break
 			}
 		}
+	}
+	if topOverride >= 0 {
+		top = topOverride
 	}
 	if top < 0 {
 		return nil, fmt.Errorf("couldn't find the card's colored border")
@@ -278,7 +302,7 @@ func banner(path, iconPath, footer string) error {
 		}
 	}
 	text(img, black, "Player.gg", 86, 290, color.White)
-	text(img, bold, "Your games, your server, your verdict.", 92, 352, color.RGBA{0xd6, 0xcf, 0xff, 0xff})
+	text(img, bold, "Discover, test, and review games.", 92, 352, color.RGBA{0xd6, 0xcf, 0xff, 0xff}) // player.gg's own line
 
 	x := 92
 	for _, chip := range []string{"/profile", "/four", "/verdict", "/backlog", "/goty", "/playtests"} {
