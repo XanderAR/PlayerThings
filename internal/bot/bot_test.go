@@ -129,7 +129,7 @@ func newHarness(t *testing.T) *harness {
 	h := &harness{st: st, priv: priv, dc: &fakeDiscord{}, sy: &fakeSyncer{mp: map[string]bool{"548430": true, "1966720": true, "1145360": false}}, tests: tests,
 		secret: []byte("0123456789abcdef0123456789abcdef")}
 	h.b = &Bot{
-		AppName: "PlayRadar", InstallURL: "https://discord.com/oauth2/authorize?client_id=1",
+		AppName: "Player.gg", InstallURL: "https://discord.com/oauth2/authorize?client_id=1",
 		Store: st, Syncer: h.sy, Discord: h.dc, PublicKey: pub, LinkSecret: h.secret,
 		Links:         Links{Site: "https://bot.example", PlayerGG: "https://player.gg"},
 		PlaytestsFile: tests, PlaytestsSource: "curated list",

@@ -96,7 +96,7 @@ func preview(cfg config.Config, args []string) {
 		}
 		rest = discord.NewClient(cfg.DiscordAppID, cfg.DiscordBotToken)
 		rest.UserAgent = fmt.Sprintf("DiscordBot (%s, 0.1)", cfg.BaseURL)
-		intro := discord.ResponseData{Content: "**PlayRadar card preview** · sample players and hours; buttons point at sample data."}
+		intro := discord.ResponseData{Content: "**Player.gg card preview** · sample players and hours; buttons point at sample data."}
 		if err := rest.CreateMessage(ctx, *channel, intro); err != nil {
 			fail("post preview", err)
 		}

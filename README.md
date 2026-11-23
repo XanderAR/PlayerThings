@@ -1,4 +1,4 @@
-# PlayRadar (working name)
+# Player.gg for Discord
 
 A Discord app that gives players another way to experience player.gg and sends them there. It has playtests, profile cards and "who plays what" for servers, and every card links to player.gg. The product spec with mock output for every command is in [docs/spec.html](docs/spec.html).
 
@@ -30,7 +30,7 @@ This is an unofficial proof of concept built for player.gg. It uses only public 
 
 Replies use Discord's Components V2 layout (cards, sections, galleries). `go run ./cmd/playradar preview` renders every card from sample data and checks it against Discord's component limits; add `-channel ID` to post them in a channel so Discord validates them too.
 
-Every game button opens the game's page on player.gg. `https://player.gg/explore/games/<steam app id>.steam` resolves to player.gg's own page for that game. All player.gg links pass through `/go`, which counts the click and adds `utm_source=playradar`.
+Every game button opens the game's page on player.gg. `https://player.gg/explore/games/<steam app id>.steam` resolves to player.gg's own page for that game. All player.gg links pass through `/go`, which counts the click and adds `utm_source=discord&utm_medium=app`.
 
 ## How it's built
 

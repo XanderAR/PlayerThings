@@ -250,8 +250,8 @@ func (s *Server) goRedirect(w http.ResponseWriter, r *http.Request) {
 	guildID := clean(q.Get("g"), 24)
 
 	tq := target.Query()
-	tq.Set("utm_source", "playradar")
-	tq.Set("utm_medium", "discord")
+	tq.Set("utm_source", "discord")
+	tq.Set("utm_medium", "app")
 	if command != "" {
 		tq.Set("utm_campaign", command)
 	}

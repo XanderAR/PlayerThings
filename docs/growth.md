@@ -21,7 +21,7 @@ Research notes behind this: Letterboxd, Backloggd, Steam Replay, Spotify Wrapped
 | `/profile`, `/collage`, `/iceberg` (built) | Identity cards | "Build your shelf on player.gg" |
 | `/game`, `/whoplays` (built) | Game card | The game's player.gg page |
 
-Every link goes through `/go`, which tags `utm_source=playradar&utm_campaign=<command>&utm_content=<server>` and counts clicks per command and per server (`playradar stats`).
+Every link goes through `/go`, which tags `utm_source=discord&utm_medium=app&utm_campaign=<command>&utm_content=<server>` and counts clicks per command and per server (`playradar stats`).
 
 ## Moments: rare, opt-in, interactive
 

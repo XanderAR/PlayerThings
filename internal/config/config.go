@@ -39,7 +39,7 @@ type Config struct {
 // Load reads the configuration from the environment, applying defaults.
 func Load() (Config, error) {
 	c := Config{
-		AppName:             env("APP_NAME", "PlayRadar"),
+		AppName:             env("APP_NAME", "Player.gg"),
 		BaseURL:             strings.TrimRight(env("BASE_URL", "http://localhost:8080"), "/"),
 		Port:                env("PORT", "8080"),
 		DiscordAppID:        env("DISCORD_APP_ID", ""),

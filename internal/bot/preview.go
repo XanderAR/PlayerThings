@@ -52,7 +52,7 @@ func Preview(ctx context.Context, dir string, files PreviewFiles, siteURL, youID
 	}
 	capture := &captureDiscord{}
 	b := &Bot{
-		AppName: "PlayRadar", InstallURL: "https://discord.com/oauth2/authorize",
+		AppName: "Player.gg", InstallURL: "https://discord.com/oauth2/authorize",
 		Store: st, Syncer: previewSyncer{}, Discord: capture,
 		LinkSecret:    previewSecret(files.LinkSecret),
 		Links:         Links{Site: siteURL, PlayerGG: "https://player.gg"},

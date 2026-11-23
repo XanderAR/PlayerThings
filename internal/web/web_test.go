@@ -49,7 +49,7 @@ func newServer(t *testing.T, steam SteamAuth, sync Syncer) (*Server, *store.Stor
 	}
 	t.Cleanup(func() { st.Close() })
 	return &Server{
-		AppName: "PlayRadar", BaseURL: "https://bot.example", PlayerGGURL: "https://player.gg",
+		AppName: "Player.gg", BaseURL: "https://bot.example", PlayerGGURL: "https://player.gg",
 		Store: st, Steam: steam, Syncer: sync, LinkSecret: []byte("0123456789abcdef0123456789abcdef"),
 		Interactions: http.NotFoundHandler(), Now: func() time.Time { return now },
 	}, st
@@ -91,7 +91,7 @@ func TestGoRedirectOnlyAllowsPlayerGG(t *testing.T) {
 	}
 	loc, _ := url.Parse(rec.Header().Get("Location"))
 	q := loc.Query()
-	if loc.Host != "player.gg" || q.Get("utm_source") != "playradar" || q.Get("utm_campaign") != "whoplays" || q.Get("utm_content") != "123" {
+	if loc.Host != "player.gg" || q.Get("utm_source") != "discord" || q.Get("utm_medium") != "app" || q.Get("utm_campaign") != "whoplays" || q.Get("utm_content") != "123" {
 		t.Fatalf("location = %s", loc)
 	}
 	rows, _ := st.UsageSince(context.Background(), "2026-11-01")
