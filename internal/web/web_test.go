@@ -186,3 +186,17 @@ func TestStaticPages(t *testing.T) {
 		t.Error("privacy page must explain deletion")
 	}
 }
+
+func TestMediaFiles(t *testing.T) {
+	s, _ := newServer(t, fakeSteam{}, fakeSyncer{})
+	rec := get(t, s, "/media/banner.png")
+	if rec.Code != 200 || rec.Header().Get("Content-Type") != "image/png" || rec.Body.Len() < 10000 {
+		t.Fatalf("banner: code %d type %s size %d", rec.Code, rec.Header().Get("Content-Type"), rec.Body.Len())
+	}
+	if rec := get(t, s, "/media/"); rec.Code != 404 {
+		t.Fatalf("folder listing: code %d", rec.Code)
+	}
+	if rec := get(t, s, "/media/nope.png"); rec.Code != 404 {
+		t.Fatalf("missing file: code %d", rec.Code)
+	}
+}

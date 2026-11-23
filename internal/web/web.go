@@ -5,9 +5,10 @@ package web
 
 import (
 	"context"
-	_ "embed"
+	"embed"
 	"errors"
 	"html/template"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -70,6 +71,7 @@ func (s *Server) Routes() http.Handler {
 		w.Header().Set("Cache-Control", "public, max-age=86400")
 		w.Write(iconPNG)
 	})
+	mux.Handle("GET /media/", http.StripPrefix("/media/", mediaHandler()))
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	return securityHeaders(mux)
 }
@@ -125,6 +127,28 @@ func (s *Server) art(w http.ResponseWriter, r *http.Request) {
 	// Art can change when a game updates its store page, so not forever.
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	w.Write(raw)
+}
+
+// mediaFiles are the images for listing pages like top.gg (built by
+// tools/topgg).
+//
+//go:embed static/media
+var mediaFiles embed.FS
+
+func mediaHandler() http.Handler {
+	sub, err := fs.Sub(mediaFiles, "static/media")
+	if err != nil {
+		panic(err)
+	}
+	files := http.FileServer(http.FS(sub))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "" || strings.HasSuffix(r.URL.Path, "/") {
+			http.NotFound(w, r) // no folder listings
+			return
+		}
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		files.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) callbackURL(token string) string {
