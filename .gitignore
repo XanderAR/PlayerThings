@@ -3,3 +3,6 @@ data/*.db
 data/*.db-*
 /playradar
 /playradar.exe
+
+# Rendered trailer (go run ./tools/trailer)
+trailer/
