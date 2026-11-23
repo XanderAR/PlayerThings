@@ -76,7 +76,8 @@ func joinMore(names []string, max int) string {
 
 // bar draws a 10-step meter for a 0-1 fraction.
 func bar(frac float64) string {
-	if frac < 0 {
+	if frac != frac || frac < 0 { // NaN (0/0) or below zero
+
 		frac = 0
 	}
 	if frac > 1 {

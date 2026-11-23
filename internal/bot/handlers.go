@@ -20,7 +20,7 @@ const steamPlatform = "steam"
 func (b *Bot) cmdLink(ctx context.Context, in *discord.Interaction) discord.Response {
 	user := in.Invoker()
 	token := linktoken.Sign(b.LinkSecret, linktoken.Claims{
-		DiscordID: user.ID, GuildID: in.GuildID, Expires: b.now().Add(30 * time.Minute),
+		DiscordID: user.ID, GuildID: in.GuildID, Name: user.DisplayName(), Expires: b.now().Add(30 * time.Minute),
 	})
 	linkURL := b.Links.Site + "/link?t=" + url.QueryEscape(token)
 

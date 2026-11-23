@@ -99,15 +99,22 @@ func (b *Bot) RunFeeds(ctx context.Context) {
 	t := time.NewTicker(5 * time.Minute)
 	defer t.Stop()
 	for {
-		b.postNewPlaytests(ctx)
-		b.postMoments(ctx)
-		b.postDueCharts(ctx)
+		b.feedTick(ctx)
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
 		}
 	}
+}
+
+// feedTick runs one round of scheduled posts, logging a panic instead of
+// taking the process down.
+func (b *Bot) feedTick(ctx context.Context) {
+	defer b.recoverPanic("scheduled posts")
+	b.postNewPlaytests(ctx)
+	b.postMoments(ctx)
+	b.postDueCharts(ctx)
 }
 
 // radarWelcome posts what's live right now and marks every current playtest
@@ -136,15 +143,15 @@ func (b *Bot) radarWelcome(ctx context.Context, feed store.Feed) error {
 		discord.Container(colorLive, parts...),
 		discord.ActionRow(b.allPlaytestsButton("radar", feed.GuildID)),
 	)
-	if err := b.post(ctx, feed, data); err != nil {
-		return err
-	}
+	postErr := b.post(ctx, feed, data)
+	// Mark what's open now as seen even if the welcome failed; otherwise the
+	// next tick posts every current playtest one by one.
 	for _, p := range current {
-		if err := b.Store.MarkRadarPosted(ctx, feed.GuildID, p.URL, b.now()); err != nil {
+		if err := b.Store.MarkRadarPosted(context.WithoutCancel(ctx), feed.GuildID, p.URL, b.now()); err != nil {
 			return err
 		}
 	}
-	return nil
+	return postErr
 }
 
 func (b *Bot) postNewPlaytests(ctx context.Context) {
@@ -180,7 +187,10 @@ func (b *Bot) postNewPlaytests(ctx context.Context) {
 				b.log().Warn("radar post", "guild", f.GuildID, "err", err)
 				break
 			}
-			_ = b.Store.MarkRadarPosted(ctx, f.GuildID, p.URL, b.now())
+			// Record it even if shutdown has started, or it posts again after a restart.
+			if err := b.Store.MarkRadarPosted(context.WithoutCancel(ctx), f.GuildID, p.URL, b.now()); err != nil {
+				b.log().Error("mark playtest posted", "guild", f.GuildID, "err", err)
+			}
 			time.Sleep(500 * time.Millisecond)
 		}
 	}
@@ -246,7 +256,9 @@ func (b *Bot) postDueCharts(ctx context.Context) {
 				continue
 			}
 		}
-		_ = b.Store.MarkFeedPosted(ctx, f.GuildID, f.Kind, b.now())
+		if err := b.Store.MarkFeedPosted(context.WithoutCancel(ctx), f.GuildID, f.Kind, b.now()); err != nil {
+			b.log().Error("mark chart posted", "guild", f.GuildID, "err", err)
+		}
 	}
 }
 

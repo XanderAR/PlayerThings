@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -81,8 +82,10 @@ func TestShelfImageNeedsAValidSignature(t *testing.T) {
 
 func TestGoRedirectOnlyAllowsPlayerGG(t *testing.T) {
 	s, st := newServer(t, fakeSteam{}, fakeSyncer{})
-	target := url.QueryEscape("https://player.gg/explore/games/548430.steam")
-	rec := get(t, s, "/go?u="+target+"&c=whoplays&g=123")
+	raw := "https://player.gg/explore/games/548430.steam"
+	target := url.QueryEscape(raw)
+	sig := linktoken.SignClick(s.LinkSecret, raw, "whoplays", "123")
+	rec := get(t, s, "/go?u="+target+"&c=whoplays&g=123&s="+sig)
 	if rec.Code != http.StatusFound {
 		t.Fatalf("code = %d", rec.Code)
 	}
@@ -96,6 +99,18 @@ func TestGoRedirectOnlyAllowsPlayerGG(t *testing.T) {
 		t.Fatalf("usage = %+v", rows)
 	}
 
+	// Made-up links still redirect, but aren't counted (so nobody can fill the
+	// database with random ones).
+	for i := 0; i < 5; i++ {
+		rec := get(t, s, fmt.Sprintf("/go?u=%s&c=whoplays&g=%d", target, 900+i))
+		if rec.Code != http.StatusFound {
+			t.Fatalf("unsigned link: code %d", rec.Code)
+		}
+	}
+	if rows, _ := st.UsageSince(context.Background(), "2026-11-01"); len(rows) != 1 || rows[0].Count != 1 {
+		t.Fatalf("unsigned clicks were counted: %+v", rows)
+	}
+
 	for _, bad := range []string{"https://evil.example/x", "http://player.gg/x", "https://notplayer.gg/x", "javascript:alert(1)", ""} {
 		if rec := get(t, s, "/go?u="+url.QueryEscape(bad)); rec.Code != http.StatusBadRequest {
 			t.Errorf("%q: code = %d", bad, rec.Code)
@@ -105,10 +120,12 @@ func TestGoRedirectOnlyAllowsPlayerGG(t *testing.T) {
 
 func TestLinkPage(t *testing.T) {
 	s, _ := newServer(t, fakeSteam{}, fakeSyncer{})
-	tok := linktoken.Sign(s.LinkSecret, linktoken.Claims{DiscordID: "100", GuildID: "G", Expires: now.Add(time.Minute)})
+	tok := linktoken.Sign(s.LinkSecret, linktoken.Claims{DiscordID: "100", GuildID: "G", Name: "Mara <3", Expires: now.Add(time.Minute)})
 	rec := get(t, s, "/link?t="+url.QueryEscape(tok))
 	body := rec.Body.String()
-	if rec.Code != 200 || !strings.Contains(body, "Sign in through Steam") || !strings.Contains(body, "leaderboards") {
+	// The page names the Discord account, so a link sent by someone else stands out.
+	if rec.Code != 200 || !strings.Contains(body, "Sign in through Steam") || !strings.Contains(body, "leaderboards") ||
+		!strings.Contains(body, "Discord account <b>Mara &lt;3</b>") {
 		t.Fatalf("code %d body %s", rec.Code, body)
 	}
 	if rec.Header().Get("Referrer-Policy") != "no-referrer" {

@@ -123,6 +123,7 @@ type LibraryEntry struct {
 
 // Profile is the account details refreshed on each sync.
 type Profile struct {
+	ExternalID  string // the platform account fetched; SaveSync checks it's still linked
 	DisplayName string
 	AvatarURL   string
 	ProfileURL  string
@@ -194,7 +195,41 @@ var addedColumns = []struct{ table, column, def string }{
 	{"games", "reviews", "INTEGER NOT NULL DEFAULT 0"},
 	{"games", "release_year", "INTEGER NOT NULL DEFAULT 0"},
 	{"games", "details_at", "INTEGER NOT NULL DEFAULT 0"},
+	{"games", "software", "INTEGER NOT NULL DEFAULT 0"},
 }
+
+// softwareGenres are Steam's genres for apps that aren't games (Wallpaper
+// Engine, Blender, RPG Maker...). Steam lists them in libraries with
+// playtime, so without this they'd top people's charts.
+var softwareGenres = []string{
+	"Utilities", "Design & Illustration", "Animation & Modeling", "Video Production", "Audio Production",
+	"Photo Editing", "Software Training", "Web Publishing", "Game Development", "Accounting", "Education",
+}
+
+// IsSoftware reports whether a Steam title's genres mark it as software.
+func IsSoftware(genres []string) bool {
+	for _, g := range genres {
+		for _, s := range softwareGenres {
+			if strings.EqualFold(strings.TrimSpace(g), s) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// softwareBackfill marks software among games looked up before the software
+// column existed. It's cheap, so it runs on every start.
+func softwareBackfill() string {
+	var conds []string
+	for _, s := range softwareGenres {
+		conds = append(conds, "(',' || genres || ',') LIKE '%,"+s+",%'")
+	}
+	return `UPDATE games SET software = CASE WHEN ` + strings.Join(conds, " OR ") + ` THEN 1 ELSE 0 END WHERE details_at > 0`
+}
+
+// notSoftware is a condition on a joined games row "g" that leaves software out.
+const notSoftware = ` g.software = 0 `
 
 func migrate(db *sql.DB) error {
 	have := map[string]bool{}
@@ -223,6 +258,9 @@ func migrate(db *sql.DB) error {
 		if _, err := db.Exec(`ALTER TABLE ` + c.table + ` ADD COLUMN ` + c.column + ` ` + c.def); err != nil {
 			return fmt.Errorf("add %s.%s: %w", c.table, c.column, err)
 		}
+	}
+	if _, err := db.Exec(softwareBackfill()); err != nil {
+		return fmt.Errorf("mark software: %w", err)
 	}
 	return nil
 }
@@ -292,10 +330,31 @@ func (s *Store) DueForSync(ctx context.Context, platform string, cutoff, retryCu
 	return out, rows.Err()
 }
 
+// ErrRelinked means the account was linked to a different platform account
+// while a sync was running, so that sync's data was thrown away.
+var ErrRelinked = errors.New("account was re-linked during the sync")
+
+// snapshotDays is how long playtime snapshots are kept.
+const snapshotDays = 180
+
 // SaveSync replaces an account's library with freshly synced data and records
-// a playtime snapshot for every game whose total changed.
+// a playtime snapshot for every game whose total changed. When p.ExternalID
+// is set, it must still be the linked account's ID.
 func (s *Store) SaveSync(ctx context.Context, discordID, platform string, p Profile, games []Game, entries []LibraryEntry, now time.Time) error {
 	return s.tx(ctx, func(tx *sql.Tx) error {
+		if p.ExternalID != "" {
+			// The account may have been re-linked to another platform account
+			// while this one was being fetched; never save one over the other.
+			var current string
+			err := tx.QueryRowContext(ctx, `SELECT external_id FROM accounts WHERE discord_id = ? AND platform = ?`,
+				discordID, platform).Scan(&current)
+			if errors.Is(err, sql.ErrNoRows) || (err == nil && current != p.ExternalID) {
+				return ErrRelinked
+			}
+			if err != nil {
+				return err
+			}
+		}
 		upsertGame, err := tx.PrepareContext(ctx, `
 			INSERT INTO games (platform, game_id, name, image_url, store_url) VALUES (?, ?, ?, ?, ?)
 			ON CONFLICT (platform, game_id) DO UPDATE SET
@@ -362,6 +421,12 @@ func (s *Store) SaveSync(ctx context.Context, discordID, platform string, p Prof
 			}
 		}
 
+		// Snapshots aren't read yet; keep half a year so they can't grow forever.
+		if _, err := tx.ExecContext(ctx, `DELETE FROM playtime_snapshots WHERE discord_id = ? AND platform = ? AND day < ?`,
+			discordID, platform, now.UTC().AddDate(0, 0, -snapshotDays).Format("2006-01-02")); err != nil {
+			return err
+		}
+
 		_, err = tx.ExecContext(ctx, `
 			UPDATE accounts SET display_name = ?, avatar_url = ?, profile_url = ?, library_private = ?,
 			       synced_at = ?, sync_error = ''
@@ -390,8 +455,9 @@ type Stats struct {
 func (s *Store) LibraryStats(ctx context.Context, discordID, platform string) (Stats, error) {
 	var st Stats
 	err := s.db.QueryRowContext(ctx, `
-		SELECT COUNT(*), COALESCE(SUM(minutes_total), 0), COALESCE(SUM(minutes_recent), 0)
-		FROM library WHERE discord_id = ? AND platform = ?`,
+		SELECT COUNT(*), COALESCE(SUM(l.minutes_total), 0), COALESCE(SUM(l.minutes_recent), 0)
+		FROM library l JOIN games g ON g.platform = l.platform AND g.game_id = l.game_id
+		WHERE l.discord_id = ? AND l.platform = ? AND`+notSoftware,
 		discordID, platform).Scan(&st.Games, &st.Minutes, &st.RecentMinutes)
 	return st, err
 }
@@ -405,7 +471,7 @@ func (s *Store) TopGames(ctx context.Context, discordID, platform string, recent
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT `+gameColumns+`, l.minutes_total, l.minutes_recent
 		FROM library l JOIN games g ON g.platform = l.platform AND g.game_id = l.game_id
-		WHERE l.discord_id = ? AND l.platform = ? AND `+order+` > 0
+		WHERE l.discord_id = ? AND l.platform = ? AND `+order+` > 0 AND`+notSoftware+`
 		ORDER BY `+order+` DESC, g.name LIMIT ?`, discordID, platform, limit)
 	if err != nil {
 		return nil, err
@@ -576,7 +642,7 @@ func (s *Store) ServerChart(ctx context.Context, guildID, platform string, limit
 		FROM guild_visibility v
 		JOIN library l ON l.discord_id = v.discord_id AND l.platform = ?
 		JOIN games g ON g.platform = l.platform AND g.game_id = l.game_id
-		WHERE v.guild_id = ? AND v.visible = 1 AND l.minutes_recent > 0
+		WHERE v.guild_id = ? AND v.visible = 1 AND l.minutes_recent > 0 AND`+notSoftware+`
 		GROUP BY g.platform, g.game_id
 		ORDER BY minutes DESC, players DESC LIMIT ?`, platform, guildID, limit)
 	if err != nil {
@@ -636,6 +702,7 @@ func (s *Store) DeleteUser(ctx context.Context, discordID string) error {
 			`DELETE FROM guild_visibility WHERE discord_id = ?`,
 			`DELETE FROM moment_votes WHERE discord_id = ?`,
 			`DELETE FROM favorites WHERE discord_id = ?`,
+			`UPDATE channel_feeds SET created_by = '' WHERE created_by = ?`,
 		} {
 			if _, err := tx.ExecContext(ctx, q, discordID); err != nil {
 				return err
@@ -651,7 +718,8 @@ func (s *Store) HasData(ctx context.Context, discordID string) (bool, error) {
 	err := s.db.QueryRowContext(ctx, `
 		SELECT (SELECT COUNT(*) FROM accounts WHERE discord_id = ?) +
 		       (SELECT COUNT(*) FROM guild_visibility WHERE discord_id = ?) +
-		       (SELECT COUNT(*) FROM favorites WHERE discord_id = ?)`, discordID, discordID, discordID).Scan(&n)
+		       (SELECT COUNT(*) FROM favorites WHERE discord_id = ?) +
+		       (SELECT COUNT(*) FROM moment_votes WHERE discord_id = ?)`, discordID, discordID, discordID, discordID).Scan(&n)
 	return n > 0, err
 }
 

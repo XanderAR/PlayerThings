@@ -140,6 +140,9 @@ func serve(cfg config.Config) {
 	if err != nil {
 		fail("DISCORD_PUBLIC_KEY", err)
 	}
+	if os.Getenv("BASE_URL") == "" {
+		log.Warn("BASE_URL is not set: links and images will point at", "url", cfg.BaseURL)
+	}
 	if cfg.SteamAPIKey == "" {
 		log.Warn("STEAM_API_KEY is not set: Steam sign-in works, but libraries won't sync until it is")
 	}
@@ -164,7 +167,7 @@ func serve(cfg config.Config) {
 		Discord:         rest,
 		PublicKey:       pub,
 		LinkSecret:      []byte(cfg.LinkSecret),
-		Links:           bot.Links{Site: cfg.BaseURL, PlayerGG: cfg.PlayerGGURL},
+		Links:           bot.Links{Site: cfg.BaseURL, PlayerGG: cfg.PlayerGGURL, Secret: []byte(cfg.LinkSecret)},
 		PlaytestsFile:   cfg.PlaytestsFile,
 		PlaytestsSource: cfg.PlaytestsSource,
 		CollectionsFile: cfg.CollectionsFile,
@@ -189,8 +192,9 @@ func serve(cfg config.Config) {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	go sync.Run(ctx)
-	go b.RunFeeds(ctx)
+	syncDone, feedsDone := make(chan struct{}), make(chan struct{})
+	go func() { defer close(syncDone); sync.Run(ctx) }()
+	go func() { defer close(feedsDone); b.RunFeeds(ctx) }()
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
@@ -199,17 +203,34 @@ func serve(cfg config.Config) {
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,
 	}
+	shutdownDone := make(chan struct{})
 	go func() {
+		defer close(shutdownDone)
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		_ = srv.Shutdown(shutdownCtx)
+		_ = srv.Shutdown(shutdownCtx) // waits for requests in flight
 	}()
 	log.Info("listening", "port", cfg.Port, "base_url", cfg.BaseURL)
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		fail("http server", err)
 	}
+	// ListenAndServe returns as soon as shutdown starts: let requests in
+	// flight finish, then the replies they deferred, then the background
+	// loops (so a post that just went out is recorded and not repeated).
+	<-shutdownDone
 	b.Wait()
+	select {
+	case <-syncDone:
+	case <-time.After(10 * time.Second):
+		log.Warn("sync loop didn't stop in time")
+	}
+	select {
+	case <-feedsDone:
+	case <-time.After(10 * time.Second):
+		log.Warn("scheduled posts didn't stop in time")
+	}
+	log.Info("stopped")
 }
 
 func register(cfg config.Config, args []string) {

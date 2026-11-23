@@ -112,7 +112,9 @@ func Preview(ctx context.Context, dir string, files PreviewFiles, siteURL, youID
 	run("/incommon", command("incommon", opt("friend", previewMara), opt("friend2", previewTheo)))
 	run("/chart", command("chart"))
 	run("/playtests", command("playtests"))
-	run("/playtests → details", clickOn("pt:s:0:", "0"))
+	if list, err := b.currentPlaytests(""); err == nil && len(list) > 0 {
+		run("/playtests → details", clickOn("pt:s:0:", playtestKey(list[0])))
+	}
 	run("/goty", command("goty"))
 	run("/goty scope:server", command("goty", opt("scope", "server")))
 	run("/collection", command("collection"))

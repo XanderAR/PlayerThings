@@ -20,6 +20,10 @@ import (
 // ErrBudget is returned when the daily Web API call budget is used up.
 var ErrBudget = errors.New("steam daily API budget used up")
 
+// ErrBadData means the store answered with something unreadable for one app.
+// Asking again won't help, unlike a network error or rate limit.
+var ErrBadData = errors.New("steam store sent unreadable data")
+
 // ErrNoKey is returned by Web API calls when no API key is configured.
 // Sign-in and store lookups don't need a key, so they keep working.
 var ErrNoKey = errors.New("STEAM_API_KEY is not set")
@@ -156,7 +160,7 @@ func (c *Client) GameDetails(ctx context.Context, appID string) (Details, bool, 
 		Data    json.RawMessage `json:"data"`
 	}
 	if err := json.Unmarshal(raw, &body); err != nil {
-		return Details{}, false, fmt.Errorf("decode appdetails: %w", err)
+		return Details{}, false, fmt.Errorf("%w: appdetails: %v", ErrBadData, err)
 	}
 	entry, ok := body[appID]
 	if !ok || !entry.Success {
@@ -181,7 +185,7 @@ func (c *Client) GameDetails(ctx context.Context, appID string) (Details, bool, 
 		} `json:"release_date"`
 	}
 	if err := json.Unmarshal(entry.Data, &data); err != nil {
-		return Details{}, false, fmt.Errorf("decode appdetails data: %w", err)
+		return Details{}, false, fmt.Errorf("%w: appdetails data: %v", ErrBadData, err)
 	}
 	d := Details{Reviews: data.Recommendations.Total, ReleaseYear: releaseYear(data.ReleaseDate.Date)}
 	for _, cat := range data.Categories {

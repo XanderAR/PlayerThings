@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -28,6 +29,7 @@ type fakeDiscord struct {
 	created   []string
 	deleted   []discord.Webhook
 	createErr error
+	postErr   error // returned by ExecuteWebhook when set
 }
 
 func (f *fakeDiscord) EditOriginal(_ context.Context, _ string, d discord.ResponseData) error {
@@ -54,6 +56,9 @@ func (f *fakeDiscord) DeleteWebhook(_ context.Context, w discord.Webhook) error 
 func (f *fakeDiscord) ExecuteWebhook(_ context.Context, _ discord.Webhook, m discord.WebhookMessage) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.postErr != nil {
+		return f.postErr
+	}
 	f.posts = append(f.posts, m)
 	return nil
 }
@@ -174,7 +179,7 @@ type rawResponse struct {
 func (h *harness) send(t *testing.T, in map[string]any) (rawResponse, int) {
 	t.Helper()
 	body, _ := json.Marshal(in)
-	ts := "1763800000"
+	ts := strconv.FormatInt(now.Unix(), 10)
 	req := httptest.NewRequest(http.MethodPost, "/interactions", bytes.NewReader(body))
 	req.Header.Set("X-Signature-Ed25519", hex.EncodeToString(ed25519.Sign(h.priv, append([]byte(ts), body...))))
 	req.Header.Set("X-Signature-Timestamp", ts)
@@ -232,5 +237,17 @@ func TestPingAndSignature(t *testing.T) {
 	h.b.ServeHTTP(rec, req)
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("bad signature: code %d", rec.Code)
+	}
+
+	// A correctly signed request from 10 minutes ago is a replay.
+	body := []byte(`{"type":1}`)
+	old := strconv.FormatInt(now.Add(-10*time.Minute).Unix(), 10)
+	req = httptest.NewRequest(http.MethodPost, "/interactions", bytes.NewReader(body))
+	req.Header.Set("X-Signature-Ed25519", hex.EncodeToString(ed25519.Sign(h.priv, append([]byte(old), body...))))
+	req.Header.Set("X-Signature-Timestamp", old)
+	rec = httptest.NewRecorder()
+	h.b.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("replayed request: code %d", rec.Code)
 	}
 }

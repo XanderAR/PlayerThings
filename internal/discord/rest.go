@@ -8,6 +8,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"regexp"
+	"strconv"
 	"time"
 )
 
@@ -33,9 +36,10 @@ func NewClient(appID, botToken string) *Client {
 
 // APIError is an error response from Discord.
 type APIError struct {
-	Status  int
-	Code    int    `json:"code"`
-	Message string `json:"message"`
+	Status     int
+	Code       int           `json:"code"`
+	Message    string        `json:"message"`
+	RetryAfter time.Duration `json:"-"` // from a 429's Retry-After header
 }
 
 func (e *APIError) Error() string {
@@ -117,7 +121,7 @@ func (c *Client) DeleteWebhook(ctx context.Context, w Webhook) error {
 	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return err
+		return transportError(http.MethodDelete, "/webhooks/"+w.ID+"/"+w.Token, err)
 	}
 	resp.Body.Close()
 	if resp.StatusCode >= 300 && resp.StatusCode != http.StatusNotFound {
@@ -142,14 +146,48 @@ func (c *Client) ExecuteWebhook(ctx context.Context, w Webhook, msg WebhookMessa
 	return c.do(ctx, http.MethodPost, path, false, msg, nil)
 }
 
+// maxRetryWait caps how long a rate-limited call waits before its one retry.
+const maxRetryWait = 5 * time.Second
+
 func (c *Client) do(ctx context.Context, method, path string, auth bool, body, out any) error {
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return err
 	}
+	err = c.once(ctx, method, path, auth, buf, out)
+	var apiErr *APIError
+	if errors.As(err, &apiErr) && apiErr.Status == http.StatusTooManyRequests {
+		wait := min(max(apiErr.RetryAfter, 100*time.Millisecond), maxRetryWait)
+		select {
+		case <-ctx.Done():
+			return err
+		case <-time.After(wait):
+		}
+		err = c.once(ctx, method, path, auth, buf, out)
+	}
+	return err
+}
+
+// tokenInPath matches the token in /webhooks/<id>/<token>/... paths.
+var tokenInPath = regexp.MustCompile(`(/webhooks/[^/]+/)[^/?]+`)
+
+// redact hides webhook and interaction tokens: they never expire and would
+// let anyone who reads the logs post as the app.
+func redact(path string) string { return tokenInPath.ReplaceAllString(path, "${1}***") }
+
+// transportError drops the URL (and the token in it) from network errors.
+func transportError(method, path string, err error) error {
+	var ue *url.Error
+	if errors.As(err, &ue) {
+		err = ue.Err
+	}
+	return fmt.Errorf("%s %s: %w", method, redact(path), err)
+}
+
+func (c *Client) once(ctx context.Context, method, path string, auth bool, buf []byte, out any) error {
 	req, err := http.NewRequestWithContext(ctx, method, c.BaseURL+path, bytes.NewReader(buf))
 	if err != nil {
-		return err
+		return transportError(method, path, err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	ua := c.UserAgent
@@ -162,15 +200,20 @@ func (c *Client) do(ctx context.Context, method, path string, auth bool, body, o
 	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return err
+		return transportError(method, path, err)
 	}
 	defer resp.Body.Close()
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
-		return err
+		return transportError(method, path, err)
 	}
 	if resp.StatusCode >= 300 {
 		apiErr := &APIError{Status: resp.StatusCode}
+		if resp.StatusCode == http.StatusTooManyRequests {
+			if secs, err := strconv.ParseFloat(resp.Header.Get("Retry-After"), 64); err == nil {
+				apiErr.RetryAfter = time.Duration(secs * float64(time.Second))
+			}
+		}
 		if json.Unmarshal(raw, apiErr) != nil || apiErr.Message == "" {
 			apiErr.Message = string(raw)
 		} else if resp.StatusCode == http.StatusBadRequest {

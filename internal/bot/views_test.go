@@ -102,7 +102,7 @@ func click(user, guild, customID string, values ...string) map[string]any {
 }
 
 func postData(m discord.WebhookMessage) discord.ResponseData {
-	return discord.ResponseData{Content: m.Content, Embeds: m.Embeds, Components: m.Components, Flags: m.Flags}
+	return discord.ResponseData{Content: m.Content, Embeds: m.Embeds, Components: m.Components, Flags: m.Flags, AllowedMentions: m.AllowedMentions}
 }
 
 func (h *harness) details(t *testing.T, id string, reviews int, genres ...string) {
@@ -488,7 +488,13 @@ func TestPlaytestsPageAndDetails(t *testing.T) {
 	}
 
 	// The details menu swaps in one playtest, with a fit note and a way back.
-	r, _ = h.send(t, click("100", "G", "pt:s:0:", "0"))
+	var menu discord.Component
+	walk(d.Components, func(c discord.Component) {
+		if c.Type == discord.ComponentStringSelect {
+			menu = c
+		}
+	})
+	r, _ = h.send(t, click("100", "G", "pt:s:0:", menu.Options[0].Value))
 	d = valid(t, messageData(t, r))
 	if r.Type != discord.ResponseUpdateMessage || !strings.Contains(texts(d), "## Starfall Outriders\n-# by Lumen Forge") ||
 		!strings.Contains(texts(d), "🎯 **3 members here** play games like Deep Rock Galactic") || !hasCustomID(d, "pt:p:0:") {

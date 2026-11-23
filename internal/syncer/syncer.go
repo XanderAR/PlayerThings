@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -17,6 +18,10 @@ import (
 
 // ErrBusy means the account is already being synced.
 var ErrBusy = errors.New("sync already running for this account")
+
+// emptyLibrary is the sync error recorded the first time Steam sends no games
+// for a library that had some.
+const emptyLibrary = "steam sent an empty library; keeping the last one until it does so twice"
 
 // Result is one fetch from a platform.
 type Result struct {
@@ -74,6 +79,16 @@ func (s *Syncer) Sync(ctx context.Context, discordID, platform string) (store.Pr
 		_ = s.Store.MarkSyncError(ctx, discordID, platform, err.Error(), s.now())
 		return store.Profile{}, 0, err
 	}
+	// Steam sometimes answers with an empty library for a moment. Only treat
+	// it as private once it happens twice in a row, so a blip doesn't wipe a
+	// library that loaded before.
+	if res.Profile.Private && !acct.LibraryPrivate && acct.SyncError != emptyLibrary {
+		if stats, err := s.Store.LibraryStats(ctx, discordID, platform); err == nil && stats.Games > 0 {
+			_ = s.Store.MarkSyncError(ctx, discordID, platform, emptyLibrary, s.now())
+			return store.Profile{}, 0, errors.New(emptyLibrary)
+		}
+	}
+	res.Profile.ExternalID = acct.ExternalID
 	if err := s.Store.SaveSync(ctx, discordID, platform, res.Profile, res.Games, res.Entries, s.now()); err != nil {
 		return store.Profile{}, 0, err
 	}
@@ -84,6 +99,7 @@ func (s *Syncer) Sync(ctx context.Context, discordID, platform string) (store.Pr
 // SyncSoon refreshes an account in the background.
 func (s *Syncer) SyncSoon(discordID, platform string) {
 	go func() {
+		defer s.recoverPanic("background sync")
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
 		if _, _, err := s.Sync(ctx, discordID, platform); err != nil && !errors.Is(err, ErrBusy) {
@@ -120,7 +136,7 @@ func (s *Syncer) Run(ctx context.Context) {
 	t := time.NewTicker(time.Minute)
 	defer t.Stop()
 	for {
-		s.tick(ctx)
+		s.safeTick(ctx)
 		select {
 		case <-ctx.Done():
 			return
@@ -168,10 +184,29 @@ func (s *Syncer) tick(ctx context.Context) {
 			return
 		}
 		if _, err := s.CheckGame(ctx, id); err != nil {
+			if errors.Is(err, steam.ErrBadData) {
+				// This app's store page is broken: store empty details so the
+				// warmup moves past it instead of stopping on it every tick.
+				s.log().Warn("unreadable game details; skipping", "app", id, "err", err)
+				_ = s.Store.SetGameDetails(ctx, "steam", id, store.GameDetails{}, s.now())
+				continue
+			}
 			// Likely the store rate limit; try the rest next tick.
 			s.log().Warn("game details lookup failed; pausing until next tick", "app", id, "err", err)
 			return
 		}
+	}
+}
+
+// safeTick runs one tick, logging a panic instead of taking the process down.
+func (s *Syncer) safeTick(ctx context.Context) {
+	defer s.recoverPanic("sync tick")
+	s.tick(ctx)
+}
+
+func (s *Syncer) recoverPanic(what string) {
+	if p := recover(); p != nil {
+		s.log().Error("panic", "in", what, "panic", p, "stack", string(debug.Stack()))
 	}
 }
 

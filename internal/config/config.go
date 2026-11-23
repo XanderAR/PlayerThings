@@ -59,6 +59,9 @@ func Load() (Config, error) {
 	if err != nil {
 		return c, fmt.Errorf("SYNC_INTERVAL: %w", err)
 	}
+	if interval < 10*time.Minute {
+		return c, fmt.Errorf("SYNC_INTERVAL must be at least 10m, got %s", interval)
+	}
 	c.SyncInterval = interval
 
 	budget, err := strconv.Atoi(env("STEAM_DAILY_BUDGET", "90000"))
@@ -119,7 +122,7 @@ func LoadDotEnv(path string) error {
 		if !ok {
 			continue
 		}
-		key = strings.TrimSpace(strings.TrimPrefix(key, "export "))
+		key = clean(strings.TrimPrefix(clean(key), "export "))
 		val = strings.TrimSpace(val)
 		if len(val) >= 2 && ((val[0] == '"' && val[len(val)-1] == '"') || (val[0] == '\'' && val[len(val)-1] == '\'')) {
 			val = val[1 : len(val)-1]

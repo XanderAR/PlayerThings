@@ -117,6 +117,7 @@ func (s *Server) linkPage(w http.ResponseWriter, r *http.Request) {
 	s.render(w, http.StatusOK, "link", map[string]any{
 		"SteamURL": s.Steam.LoginURL(s.callbackURL(token), s.BaseURL),
 		"InServer": claims.GuildID != "",
+		"For":      claims.Name,
 	})
 }
 
@@ -179,6 +180,9 @@ func (s *Server) goRedirect(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unknown link", http.StatusBadRequest)
 		return
 	}
+	// Only links the app made are counted, so nobody can fill the database
+	// by requesting made-up ones. Unsigned links still redirect.
+	signed := linktoken.VerifyClick(s.LinkSecret, q.Get("u"), q.Get("c"), q.Get("g"), q.Get("s"))
 	command := clean(q.Get("c"), 24)
 	guildID := clean(q.Get("g"), 24)
 
@@ -193,8 +197,10 @@ func (s *Server) goRedirect(w http.ResponseWriter, r *http.Request) {
 	}
 	target.RawQuery = tq.Encode()
 
-	if err := s.Store.CountUsage(r.Context(), store.UsageClick, command, guildID, s.now()); err != nil {
-		s.log().Warn("count click", "err", err)
+	if signed {
+		if err := s.Store.CountUsage(r.Context(), store.UsageClick, command, guildID, s.now()); err != nil {
+			s.log().Warn("count click", "err", err)
+		}
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	http.Redirect(w, r, target.String(), http.StatusFound)

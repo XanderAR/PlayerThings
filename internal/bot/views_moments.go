@@ -185,10 +185,30 @@ func loadJSON(path string, v any) error {
 	return json.Unmarshal(raw, v)
 }
 
+// collections loads the hand-picked collections, dropping games with no app
+// IDs and collections left with no games or no slug, so a typo in the data
+// file can't break a card.
 func (b *Bot) collections() ([]Collection, error) {
+	var raw []Collection
+	if err := loadJSON(b.CollectionsFile, &raw); err != nil {
+		return nil, err
+	}
 	var list []Collection
-	err := loadJSON(b.CollectionsFile, &list)
-	return list, err
+	for _, c := range raw {
+		var games []CollectionGame
+		for _, g := range c.Games {
+			if len(g.IDs) > 0 && g.IDs[0] != "" {
+				games = append(games, g)
+			}
+		}
+		if c.Slug == "" || len(games) == 0 {
+			b.log().Warn("skipping a collection with no slug or games", "slug", c.Slug)
+			continue
+		}
+		c.Games = games
+		list = append(list, c)
+	}
+	return list, nil
 }
 
 func (b *Bot) collectionsButton(guildID string) discord.Component {
@@ -519,7 +539,10 @@ func (b *Bot) postMoments(ctx context.Context) {
 				b.log().Warn("moment post", "guild", f.GuildID, "err", err)
 				break
 			}
-			_ = b.Store.MarkRadarPosted(ctx, f.GuildID, key, b.now())
+			// Record it even if shutdown has started, or it posts again after a restart.
+			if err := b.Store.MarkRadarPosted(context.WithoutCancel(ctx), f.GuildID, key, b.now()); err != nil {
+				b.log().Error("mark moment posted", "guild", f.GuildID, "err", err)
+			}
 		}
 	}
 }

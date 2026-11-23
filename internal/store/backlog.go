@@ -8,7 +8,7 @@ func (s *Store) Unplayed(ctx context.Context, discordID, platform string) ([]Gam
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT `+gameColumns+`
 		FROM library l JOIN games g ON g.platform = l.platform AND g.game_id = l.game_id
-		WHERE l.discord_id = ? AND l.platform = ? AND l.minutes_total = 0
+		WHERE l.discord_id = ? AND l.platform = ? AND l.minutes_total = 0 AND`+notSoftware+`
 		ORDER BY g.reviews DESC, g.name`, discordID, platform)
 	if err != nil {
 		return nil, err

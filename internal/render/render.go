@@ -56,6 +56,9 @@ const (
 	captionH     = 44       // strip under each cover for rank and hours
 	gap          = 6
 	maxTiles     = 10
+
+	maxArtPixels = 4096 * 4096 // larger store art is refused
+	maxRendering = 3           // shelves drawn at once; the rest wait
 )
 
 func size(layout string) (cols, rows int) {
@@ -148,6 +151,7 @@ type Renderer struct {
 	output map[string][]byte      // finished JPEGs by layout and tiles
 
 	big, small font.Face
+	busy       chan struct{} // limits renders running at once
 }
 
 // New returns a Renderer that fetches art from Steam's CDN.
@@ -181,6 +185,7 @@ func (r *Renderer) init() error {
 	}
 	r.art = map[string]image.Image{}
 	r.output = map[string][]byte{}
+	r.busy = make(chan struct{}, maxRendering)
 	return nil
 }
 
@@ -204,6 +209,13 @@ func (r *Renderer) Shelf(ctx context.Context, layout string, tiles []Tile) ([]by
 		return out, nil
 	}
 	r.mu.Unlock()
+
+	select {
+	case r.busy <- struct{}{}:
+		defer func() { <-r.busy }()
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 
 	cols, rows := size(layout)
 	if len(tiles) > cols*rows {
@@ -298,12 +310,25 @@ func (r *Renderer) fetch(ctx context.Context, url string) (image.Image, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("%s: %s", url, resp.Status)
 	}
-	img, _, err := image.Decode(io.LimitReader(resp.Body, 8<<20))
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
 	if err != nil {
 		return nil, err
 	}
-	// Keep a small version: tiles never need more than this.
-	small := image.NewRGBA(fitRect(img.Bounds(), tileW*2, tileH*2))
+	// Check the size before decoding, so one huge image can't eat the memory.
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(raw))
+	if err != nil {
+		return nil, err
+	}
+	if cfg.Width <= 0 || cfg.Height <= 0 || cfg.Width*cfg.Height > maxArtPixels {
+		return nil, fmt.Errorf("%s: image is %dx%d", url, cfg.Width, cfg.Height)
+	}
+	img, _, err := image.Decode(bytes.NewReader(raw))
+	if err != nil {
+		return nil, err
+	}
+	// Keep a copy just big enough to fill a tile (about 350 KB for a cover),
+	// so the cache stays small.
+	small := image.NewRGBA(coverRect(img.Bounds(), tileW, tileH))
 	draw.ApproxBiLinear.Scale(small, small.Bounds(), img, img.Bounds(), draw.Src, nil)
 	r.mu.Lock()
 	if len(r.art) > 400 {
@@ -314,13 +339,14 @@ func (r *Renderer) fetch(ctx context.Context, url string) (image.Image, error) {
 	return small, nil
 }
 
-// fitRect scales b down to fit within w x h, keeping its shape.
-func fitRect(b image.Rectangle, w, h int) image.Rectangle {
+// coverRect scales b down until it just covers w x h, keeping its shape, so a
+// tile can still be cropped from it at full sharpness.
+func coverRect(b image.Rectangle, w, h int) image.Rectangle {
 	bw, bh := b.Dx(), b.Dy()
-	if bw <= w && bh <= h {
+	scale := max(float64(w)/float64(bw), float64(h)/float64(bh))
+	if scale >= 1 {
 		return image.Rect(0, 0, bw, bh)
 	}
-	scale := min(float64(w)/float64(bw), float64(h)/float64(bh))
 	return image.Rect(0, 0, max(1, int(float64(bw)*scale)), max(1, int(float64(bh)*scale)))
 }
 

@@ -48,6 +48,7 @@ footer a { color:var(--muted); }
 
 {{define "link"}}
 <h1>Link your Steam account</h1>
+{{if .For}}<p>This link is for the Discord account <b>{{.For}}</b>. If that isn't you, close this page: someone may be trying to link your Steam to their account.</p>{{end}}
 <p>You'll sign in on Steam's own site. {{.App}} only receives your Steam ID, never your password.</p>
 <p>We then read your public Steam profile, the games you own and your playtime, and refresh them about twice a day.</p>
 {{if .InServer}}<p>Because you started from a server, you'll also appear on that server's leaderboards. Turn that off any time with <b>/visibility</b>.</p>{{end}}
@@ -66,7 +67,7 @@ footer a { color:var(--muted); }
 
 {{define "privacy"}}
 <h1>Privacy</h1>
-<p>This Discord app is an independent proof of concept built around player.gg. It isn't operated by player.gg, Valve or Discord.</p>
+<p>This Discord app is an unofficial proof of concept built for player.gg. It isn't yet an official player.gg product, and it isn't operated by Valve or Discord.</p>
 <h2>What we store</h2>
 <ul>
 <li>Your Discord user ID.</li>
@@ -90,7 +91,7 @@ footer a { color:var(--muted); }
 
 {{define "terms"}}
 <h1>Terms</h1>
-<p>This Discord app is a free, independent proof of concept provided as is, without guarantees that it will be available or error-free.</p>
+<p>This Discord app is a free, unofficial proof of concept provided as is, without guarantees that it will be available or error-free.</p>
 <p>Don't use it to harass people, scrape data, or get around anyone's privacy settings. We may stop serving any server or user that does.</p>
 <p>Game data comes from Steam and is shown under Valve's API terms. {{.App}} isn't endorsed by Valve, Discord or player.gg.</p>
 <p>See the <a href="/privacy">privacy page</a> for what's stored and how to delete it.</p>

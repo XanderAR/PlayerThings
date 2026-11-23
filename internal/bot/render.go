@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"playradar/internal/discord"
+	"playradar/internal/linktoken"
 	"playradar/internal/render"
 	"playradar/internal/store"
 )
@@ -17,6 +18,7 @@ import (
 type Links struct {
 	Site     string // this app's public base URL
 	PlayerGG string // https://player.gg
+	Secret   []byte // signs click links so only real ones are counted
 }
 
 // Go wraps target in the click-counting redirect.
@@ -27,6 +29,7 @@ func (l Links) Go(target, command, guildID string) string {
 	if guildID != "" {
 		q.Set("g", guildID)
 	}
+	q.Set("s", linktoken.SignClick(l.Secret, target, command, guildID))
 	return l.Site + "/go?" + q.Encode()
 }
 

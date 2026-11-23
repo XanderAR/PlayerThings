@@ -2,7 +2,7 @@
 
 A Discord app that gives players another way to experience player.gg and sends them there. It has playtests, profile cards and "who plays what" for servers, and every card links to player.gg. The product spec with mock output for every command is in [docs/spec.html](docs/spec.html).
 
-This is an independent proof of concept. It uses only public Steam data and public player.gg URLs, and isn't run by player.gg.
+This is an unofficial proof of concept built for player.gg. It uses only public Steam data and public player.gg URLs, and isn't yet an official player.gg product.
 
 ## What works
 

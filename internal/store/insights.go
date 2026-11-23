@@ -24,9 +24,9 @@ func (s *Store) SetGameDetails(ctx context.Context, platform, gameID string, d G
 		mp = boolInt(*d.Multiplayer)
 	}
 	_, err := s.db.ExecContext(ctx, `
-		UPDATE games SET multiplayer = ?, checked_at = ?, genres = ?, reviews = ?, release_year = ?, details_at = ?
+		UPDATE games SET multiplayer = ?, checked_at = ?, genres = ?, reviews = ?, release_year = ?, details_at = ?, software = ?
 		WHERE platform = ? AND game_id = ?`,
-		mp, now.Unix(), joinGenres(d.Genres), d.Reviews, d.ReleaseYear, now.Unix(), platform, gameID)
+		mp, now.Unix(), joinGenres(d.Genres), d.Reviews, d.ReleaseYear, now.Unix(), boolInt(IsSoftware(d.Genres)), platform, gameID)
 	return err
 }
 
@@ -83,7 +83,7 @@ func (s *Store) YearGames(ctx context.Context, discordID, platform string, year,
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT `+gameColumns+`, l.minutes_total, l.minutes_recent
 		FROM library l JOIN games g ON g.platform = l.platform AND g.game_id = l.game_id
-		WHERE l.discord_id = ? AND l.platform = ? AND l.minutes_total > 0 AND g.release_year = ?
+		WHERE l.discord_id = ? AND l.platform = ? AND l.minutes_total > 0 AND g.release_year = ? AND`+notSoftware+`
 		ORDER BY l.minutes_total DESC, g.name LIMIT ?`, discordID, platform, year, limit)
 	if err != nil {
 		return nil, err
@@ -109,7 +109,7 @@ func (s *Store) ServerYearGames(ctx context.Context, guildID, platform string, y
 		FROM guild_visibility v
 		JOIN library l ON l.discord_id = v.discord_id AND l.platform = ?
 		JOIN games g ON g.platform = l.platform AND g.game_id = l.game_id
-		WHERE v.guild_id = ? AND v.visible = 1 AND l.minutes_total > 0 AND g.release_year = ?
+		WHERE v.guild_id = ? AND v.visible = 1 AND l.minutes_total > 0 AND g.release_year = ? AND`+notSoftware+`
 		GROUP BY g.platform, g.game_id
 		ORDER BY minutes DESC, players DESC LIMIT ?`, platform, guildID, year, limit)
 	if err != nil {
@@ -142,6 +142,7 @@ const visibleLibraries = `
 	FROM guild_visibility v
 	JOIN accounts a ON a.discord_id = v.discord_id AND a.platform = ? AND a.library_private = 0
 	JOIN library l ON l.discord_id = a.discord_id AND l.platform = a.platform
+	JOIN games g ON g.platform = l.platform AND g.game_id = l.game_id AND` + notSoftware + `
 	WHERE v.guild_id = ? AND v.visible = 1`
 
 // Leaderboard ranks a server's opted-in members. kind is "hours" (all-time
@@ -307,7 +308,7 @@ func (s *Store) GenreMinutes(ctx context.Context, discordID, platform string, li
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT g.genres, l.minutes_total
 		FROM library l JOIN games g ON g.platform = l.platform AND g.game_id = l.game_id
-		WHERE l.discord_id = ? AND l.platform = ? AND l.minutes_total > 0 AND g.genres != ''`,
+		WHERE l.discord_id = ? AND l.platform = ? AND l.minutes_total > 0 AND g.genres != '' AND`+notSoftware,
 		discordID, platform)
 	if err != nil {
 		return nil, err

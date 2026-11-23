@@ -9,6 +9,8 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"runtime/debug"
+	"strconv"
 	"sync"
 	"time"
 
@@ -55,6 +57,9 @@ type Bot struct {
 	wg sync.WaitGroup
 }
 
+// maxRequestAge is how far a request's signed timestamp may be from now.
+const maxRequestAge = 5 * time.Minute
+
 // ServeHTTP is the interactions endpoint.
 func (b *Bot) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
@@ -64,6 +69,13 @@ func (b *Bot) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if !discord.Verify(b.PublicKey, r, body) {
 		http.Error(w, "invalid request signature", http.StatusUnauthorized)
+		return
+	}
+	// The timestamp is signed too; refuse old ones so a captured request
+	// can't be replayed later.
+	ts, err := strconv.ParseInt(r.Header.Get("X-Signature-Timestamp"), 10, 64)
+	if age := b.now().Sub(time.Unix(ts, 0)); err != nil || age > maxRequestAge || age < -maxRequestAge {
+		http.Error(w, "stale request", http.StatusUnauthorized)
 		return
 	}
 	var in discord.Interaction
@@ -158,7 +170,17 @@ func (b *Bot) later(in *discord.Interaction, ephemeral bool, work func(ctx conte
 		defer b.wg.Done()
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
-		data := work(ctx)
+		var data discord.ResponseData
+		func() {
+			// A panic here would take the whole process down; answer instead.
+			defer func() {
+				if p := recover(); p != nil {
+					b.log().Error("panic in deferred reply", "panic", p, "stack", string(debug.Stack()))
+					data = discord.ResponseData{Content: "Something went wrong on my side. Try again in a minute."}
+				}
+			}()
+			data = work(ctx)
+		}()
 		if data.AllowedMentions == nil {
 			data.AllowedMentions = discord.NoPings()
 		}
@@ -174,6 +196,12 @@ func (b *Bot) later(in *discord.Interaction, ephemeral bool, work func(ctx conte
 		resp.Data = &discord.ResponseData{Flags: discord.FlagEphemeral}
 	}
 	return resp
+}
+
+func (b *Bot) recoverPanic(what string) {
+	if p := recover(); p != nil {
+		b.log().Error("panic", "in", what, "panic", p, "stack", string(debug.Stack()))
+	}
 }
 
 func (b *Bot) oops(err error, what string) discord.Response {

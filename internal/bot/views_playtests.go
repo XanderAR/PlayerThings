@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"strconv"
 	"strings"
 
@@ -118,7 +119,7 @@ func (b *Bot) playtestPage(list []playtests.Playtest, page int, genre, guildID s
 			parts = append(parts, line())
 		}
 		options = append(options, discord.SelectOption{
-			Label: discord.Truncate(p.Title, 100), Value: strconv.Itoa(i), Description: discord.Truncate(p.Status(b.now()), 100),
+			Label: discord.Truncate(p.Title, 100), Value: playtestKey(p), Description: discord.Truncate(p.Status(b.now()), 100),
 		})
 	}
 	parts = append(parts, line(), note("Hand-picked from player.gg · tap **Request access** to sign up there"))
@@ -212,7 +213,8 @@ func (b *Bot) fitLine(ctx context.Context, guildID string, p playtests.Playtest)
 }
 
 // playtestsComponent handles page buttons (pt:p:<page>:<genre>) and the
-// details menu (pt:s:<page>:<genre>, value = index).
+// details menu (pt:s:<page>:<genre>, value = playtestKey). The key stays
+// right when the list changes after the menu was sent, unlike a position.
 func (b *Bot) playtestsComponent(ctx context.Context, in *discord.Interaction, parts []string) discord.Response {
 	if len(parts) < 3 {
 		return reply("That button has expired. Run `/playtests` again.", true)
@@ -235,11 +237,20 @@ func (b *Bot) playtestsComponent(ctx context.Context, in *discord.Interaction, p
 		return update(b.playtestPage(list, page, genre, in.GuildID))
 	case "s":
 		if len(in.Data.Values) == 1 {
-			if i, err := strconv.Atoi(in.Data.Values[0]); err == nil && i >= 0 && i < len(list) {
-				return update(b.playtestDetail(ctx, list[i], page, genre, in.GuildID))
+			for _, p := range list {
+				if playtestKey(p) == in.Data.Values[0] {
+					return update(b.playtestDetail(ctx, p, page, genre, in.GuildID))
+				}
 			}
 		}
 		return update(b.playtestPage(list, page, genre, in.GuildID))
 	}
 	return reply("That button has expired. Run `/playtests` again.", true)
+}
+
+// playtestKey is a short, stable id for a playtest in menus.
+func playtestKey(p playtests.Playtest) string {
+	h := fnv.New32a()
+	h.Write([]byte(p.URL))
+	return fmt.Sprintf("%08x", h.Sum32())
 }
