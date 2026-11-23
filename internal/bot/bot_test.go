@@ -6,6 +6,7 @@ import (
 	"crypto/ed25519"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -61,9 +62,24 @@ func (f *fakeDiscord) ExecuteWebhook(_ context.Context, _ discord.Webhook, m dis
 }
 
 type fakeSyncer struct {
-	mu   sync.Mutex
-	soon []string
-	mp   map[string]bool
+	mu     sync.Mutex
+	soon   []string
+	synced []string
+	mp     map[string]bool
+	onSync func(id string) error // what a synchronous Sync does; nil succeeds without changes
+}
+
+func (f *fakeSyncer) Sync(_ context.Context, id, _ string) (store.Profile, int, error) {
+	f.mu.Lock()
+	f.synced = append(f.synced, id)
+	on := f.onSync
+	f.mu.Unlock()
+	if on != nil {
+		if err := on(id); err != nil {
+			return store.Profile{}, 0, err
+		}
+	}
+	return store.Profile{}, 0, nil
 }
 
 func (f *fakeSyncer) SyncSoon(id, _ string) {
@@ -306,22 +322,43 @@ func TestProfile(t *testing.T) {
 	}
 }
 
-// A library whose first sync failed shows a "not loaded" note, not zeros,
-// and asking again kicks off a retry.
-func TestProfileBeforeFirstSuccessfulSync(t *testing.T) {
+// A library whose first sync failed is loaded on the spot by /profile, which
+// then shows the finished card instead of a card full of zeros.
+func TestProfileLoadsLibraryThatNeverSynced(t *testing.T) {
 	h := newHarness(t)
 	ctx := context.Background()
 	h.st.LinkAccount(ctx, store.Account{DiscordID: "500", Platform: "steam", ExternalID: "76561198000000500", LinkedAt: now.Add(-time.Hour)})
-	h.st.MarkSyncError(ctx, "500", "steam", "STEAM_API_KEY is not set", now.Add(-time.Hour))
+	h.st.MarkSyncError(ctx, "500", "steam", "steam: 403 Forbidden", now.Add(-time.Hour))
+	h.sy.onSync = func(id string) error {
+		return h.st.SaveSync(ctx, id, "steam", store.Profile{DisplayName: "Xan"},
+			[]store.Game{{GameID: "548430", Name: "Deep Rock Galactic"}},
+			[]store.LibraryEntry{{GameID: "548430", MinutesTotal: 600, MinutesRecent: 60}}, now)
+	}
 
 	r, _ := h.send(t, cmd("profile", "", "500", ""))
-	d := messageData(t, r)
-	e := d.Embeds[0]
-	if len(e.Fields) != 0 || !strings.Contains(e.Description, "hasn't loaded yet") || d.Flags&discord.FlagEphemeral == 0 {
-		t.Fatalf("profile = %+v", d)
+	if r.Type != discord.ResponseDeferredMessage {
+		t.Fatalf("type = %d, want a deferred reply", r.Type)
 	}
-	if len(h.sy.soon) != 1 {
-		t.Fatalf("expected a retry, got %d syncs", len(h.sy.soon))
+	h.b.Wait()
+	if len(h.sy.synced) != 1 || len(h.dc.edits) != 1 {
+		t.Fatalf("synced = %v, edits = %d", h.sy.synced, len(h.dc.edits))
+	}
+	e := h.dc.edits[0].Embeds[0]
+	if e.Fields[0].Value != "10 h" || e.Fields[1].Value != "1 game" || !strings.Contains(e.Fields[3].Value, "Deep Rock Galactic") {
+		t.Fatalf("card = %+v", e)
+	}
+}
+
+func TestProfileSyncFailureSaysSo(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.st.LinkAccount(ctx, store.Account{DiscordID: "500", Platform: "steam", ExternalID: "76561198000000500", LinkedAt: now})
+	h.sy.onSync = func(string) error { return errors.New("steam: 403 Forbidden") }
+
+	h.send(t, cmd("profile", "", "500", ""))
+	h.b.Wait()
+	if len(h.dc.edits) != 1 || !strings.Contains(h.dc.edits[0].Content, "didn't send your library") {
+		t.Fatalf("edits = %+v", h.dc.edits)
 	}
 }
 

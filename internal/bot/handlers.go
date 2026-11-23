@@ -99,6 +99,31 @@ func (b *Bot) cmdProfile(ctx context.Context, in *discord.Interaction) discord.R
 		return reply(mention(target.ID)+" hasn't linked an account yet.", true)
 	}
 	if self {
+		loaded, err := b.libraryLoaded(ctx, acct)
+		if err != nil {
+			return b.oops(err, "library stats")
+		}
+		if !loaded {
+			// The first sync failed or hasn't finished: load it now and show
+			// the card when it's done, instead of asking to run it again.
+			return b.later(in, false, func(ctx context.Context) discord.ResponseData {
+				syncCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+				defer cancel()
+				if _, _, err := b.Syncer.Sync(syncCtx, target.ID, steamPlatform); err != nil {
+					b.log().Warn("profile sync failed", "err", err)
+					return discord.ResponseData{Content: "Steam didn't send your library just now. I'll keep trying every 10 minutes, so run `/profile` again later."}
+				}
+				fresh, _, err := b.Store.Account(ctx, target.ID, steamPlatform)
+				if err == nil {
+					var data discord.ResponseData
+					if data, err = b.profileCard(ctx, in, target, fresh); err == nil {
+						return data
+					}
+				}
+				b.log().Error("profile after sync", "err", err)
+				return discord.ResponseData{Content: "Something went wrong on my side. Try again in a minute."}
+			})
+		}
 		stale := b.now().Sub(acct.SyncedAt) > 6*time.Hour
 		retryPrivate := acct.LibraryPrivate && b.now().Sub(acct.SyncedAt) > 10*time.Minute
 		retryFailed := acct.SyncError != "" && b.now().Sub(acct.SyncedAt) > time.Minute
@@ -106,7 +131,24 @@ func (b *Bot) cmdProfile(ctx context.Context, in *discord.Interaction) discord.R
 			b.Syncer.SyncSoon(target.ID, steamPlatform)
 		}
 	}
+	data, err := b.profileCard(ctx, in, target, acct)
+	if err != nil {
+		return b.oops(err, "profile card")
+	}
+	return message(data)
+}
 
+// libraryLoaded reports whether an account's library has synced at least once.
+func (b *Bot) libraryLoaded(ctx context.Context, acct store.Account) (bool, error) {
+	if acct.LibraryPrivate || (acct.SyncError == "" && !acct.SyncedAt.IsZero()) {
+		return true, nil
+	}
+	stats, err := b.Store.LibraryStats(ctx, acct.DiscordID, acct.Platform)
+	return stats.Games > 0, err
+}
+
+// profileCard renders a linked account's profile card.
+func (b *Bot) profileCard(ctx context.Context, in *discord.Interaction, target discord.User, acct store.Account) (discord.ResponseData, error) {
 	name := target.DisplayName()
 	if name == "" {
 		name = acct.DisplayName
@@ -125,24 +167,21 @@ func (b *Bot) cmdProfile(ctx context.Context, in *discord.Interaction) discord.R
 	} else {
 		stats, err := b.Store.LibraryStats(ctx, target.ID, steamPlatform)
 		if err != nil {
-			return b.oops(err, "library stats")
+			return discord.ResponseData{}, err
 		}
 		if stats.Games == 0 && (acct.SyncError != "" || acct.SyncedAt.IsZero()) {
 			// Never loaded: say so instead of showing a card full of zeros.
 			e.Description = "Their Steam library hasn't loaded yet."
-			if self {
-				e.Description = "Your Steam library hasn't loaded yet. It's loading now, so run `/profile` again in a minute."
-			}
 			e.Footer = &discord.EmbedFooter{Text: "Steam library not loaded yet"}
-			return message(discord.ResponseData{Embeds: []discord.Embed{e}, Flags: discord.FlagEphemeral})
+			return discord.ResponseData{Embeds: []discord.Embed{e}, Flags: discord.FlagEphemeral}, nil
 		}
 		top, err := b.Store.TopGames(ctx, target.ID, steamPlatform, false, 5)
 		if err != nil {
-			return b.oops(err, "top games")
+			return discord.ResponseData{}, err
 		}
 		recent, err := b.Store.TopGames(ctx, target.ID, steamPlatform, true, 3)
 		if err != nil {
-			return b.oops(err, "recent games")
+			return discord.ResponseData{}, err
 		}
 		e.Fields = []discord.EmbedField{
 			{Name: "Played", Value: hours(stats.Minutes), Inline: true},
@@ -170,10 +209,10 @@ func (b *Bot) cmdProfile(ctx context.Context, in *discord.Interaction) discord.R
 		}
 	}
 	buttons = append(buttons, discord.LinkButton("Get your player.gg shelf", b.Links.Go(b.Links.Join(), "profile", in.GuildID)))
-	return message(discord.ResponseData{
+	return discord.ResponseData{
 		Embeds:     []discord.Embed{e},
 		Components: []discord.Component{discord.ActionRow(buttons...)},
-	})
+	}, nil
 }
 
 // ----- /playtests -----

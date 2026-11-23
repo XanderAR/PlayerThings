@@ -72,6 +72,7 @@ func (s *Syncer) Sync(ctx context.Context, discordID, platform string) (store.Pr
 	if err := s.Store.SaveSync(ctx, discordID, platform, res.Profile, res.Games, res.Entries, s.now()); err != nil {
 		return store.Profile{}, 0, err
 	}
+	s.log().Info("synced", "platform", platform, "games", len(res.Entries), "private", res.Profile.Private)
 	return res.Profile, len(res.Entries), nil
 }
 

@@ -18,6 +18,7 @@ import (
 
 // Syncer is the part of the background syncer the bot uses.
 type Syncer interface {
+	Sync(ctx context.Context, discordID, platform string) (store.Profile, int, error)
 	SyncSoon(discordID, platform string)
 	CheckGame(ctx context.Context, appID string) (*bool, error)
 }
