@@ -30,7 +30,16 @@ type PreviewCard struct {
 // Preview renders every card the bot makes from sample data, by running real
 // interactions through the bot against a throwaway database in dir. youID is
 // shown as the person running the commands; the other players are samples.
-func Preview(ctx context.Context, dir, playtestsFile, siteURL, youID string) ([]PreviewCard, error) {
+// PreviewFiles are the data files the preview reads.
+type PreviewFiles struct {
+	Playtests, Collections, Moments string
+	// LinkSecret signs image URLs; use the live service's so its /render
+	// endpoint draws the preview's images. Empty uses a throwaway key.
+	LinkSecret string
+}
+
+func Preview(ctx context.Context, dir string, files PreviewFiles, siteURL, youID string) ([]PreviewCard, error) {
+	playtestsFile := files.Playtests
 	st, err := store.Open(filepath.Join(dir, "preview.db"))
 	if err != nil {
 		return nil, err
@@ -47,7 +56,7 @@ func Preview(ctx context.Context, dir, playtestsFile, siteURL, youID string) ([]
 		Store: st, Syncer: previewSyncer{}, Discord: capture,
 		LinkSecret:    []byte(strings.Repeat("p", 32)),
 		Links:         Links{Site: siteURL, PlayerGG: "https://player.gg"},
-		PlaytestsFile: playtestsFile, PlaytestsSource: "player.gg",
+		PlaytestsFile: playtestsFile, PlaytestsSource: "player.gg", CollectionsFile: files.Collections, MomentsFile: files.Moments,
 	}
 
 	var cards []PreviewCard
@@ -106,6 +115,16 @@ func Preview(ctx context.Context, dir, playtestsFile, siteURL, youID string) ([]
 	run("/playtests → details", clickOn("pt:s:0:", "0"))
 	run("/visibility hide", command("visibility", opt("setting", "hide")))
 	run("/unlink", command("unlink"))
+	run("/goty", command("goty"))
+	run("/goty scope:server", command("goty", opt("scope", "server")))
+	run("/collection", command("collection"))
+	run("/collection Indie hall of fame", command("collection", opt("name", "indie-hall-of-fame")))
+	if ms, err := b.moments(); err == nil && len(ms) > 0 {
+		if data, err := b.momentCard(ctx, ms[0], guild); err == nil {
+			cards = append(cards, PreviewCard{"Moment post", data})
+		}
+		run("Moment → after a vote", clickOn("mo:"+ms[0].ID+":"+ms[0].Choices[0].ID))
+	}
 
 	all, err := playtests.Load(playtestsFile)
 	if err != nil {
@@ -134,25 +153,26 @@ type previewGame struct {
 	reviews  int
 	mp       bool
 	genres   []string
+	year     int // release year; 0 means 2020
 }
 
 var previewGames = []previewGame{
-	{"730", "Counter-Strike 2", 9000000, true, []string{"Action", "Free To Play"}},
-	{"413150", "Stardew Valley", 650000, true, []string{"Indie", "RPG", "Simulation"}},
-	{"548430", "Deep Rock Galactic", 304804, true, []string{"Action"}},
-	{"427520", "Factorio", 180000, true, []string{"Strategy", "Simulation"}},
-	{"2379780", "Balatro", 150000, false, []string{"Strategy", "Indie"}},
-	{"646570", "Slay the Spire", 140000, false, []string{"Strategy", "Indie"}},
-	{"1092790", "Inscryption", 45000, false, []string{"Adventure", "Indie"}},
-	{"1102190", "Monster Train", 25000, true, []string{"Strategy", "Indie"}},
-	{"1267910", "Melvor Idle", 20000, false, []string{"RPG", "Casual"}},
-	{"1434950", "HighFleet", 8000, false, []string{"Strategy", "Simulation"}},
-	{"1127500", "Mini Motorways", 9500, false, []string{"Strategy", "Casual"}},
-	{"1782120", "ZERO Sievert", 1500, false, []string{"Action", "RPG"}},
-	{"887570", "NEBULOUS: Fleet Command", 450, true, []string{"Strategy", "Simulation"}},
-	{"2221490", "Tom Clancy's The Division 2", 210000, true, []string{"Action", "RPG"}},
-	{"230410", "Warframe", 700000, true, []string{"Action", "Free To Play"}},
-	{"1085660", "Destiny 2", 650000, true, []string{"Action", "Free To Play"}},
+	{"730", "Counter-Strike 2", 9000000, true, []string{"Action", "Free To Play"}, 0},
+	{"413150", "Stardew Valley", 650000, true, []string{"Indie", "RPG", "Simulation"}, 0},
+	{"548430", "Deep Rock Galactic", 304804, true, []string{"Action"}, 0},
+	{"427520", "Factorio", 180000, true, []string{"Strategy", "Simulation"}, 0},
+	{"2379780", "Balatro", 150000, false, []string{"Strategy", "Indie"}, 0},
+	{"646570", "Slay the Spire", 140000, false, []string{"Strategy", "Indie"}, 0},
+	{"1092790", "Inscryption", 45000, false, []string{"Adventure", "Indie"}, 2026},
+	{"1102190", "Monster Train", 25000, true, []string{"Strategy", "Indie"}, 0},
+	{"1267910", "Melvor Idle", 20000, false, []string{"RPG", "Casual"}, 0},
+	{"1434950", "HighFleet", 8000, false, []string{"Strategy", "Simulation"}, 2026},
+	{"1127500", "Mini Motorways", 9500, false, []string{"Strategy", "Casual"}, 0},
+	{"1782120", "ZERO Sievert", 1500, false, []string{"Action", "RPG"}, 2026},
+	{"887570", "NEBULOUS: Fleet Command", 450, true, []string{"Strategy", "Simulation"}, 0},
+	{"2221490", "Tom Clancy's The Division 2", 210000, true, []string{"Action", "RPG"}, 0},
+	{"230410", "Warframe", 700000, true, []string{"Action", "Free To Play"}, 0},
+	{"1085660", "Destiny 2", 650000, true, []string{"Action", "Free To Play"}, 0},
 }
 
 // seedPreview links you and two sample friends, all visible in the guild.
@@ -196,7 +216,7 @@ func seedPreview(ctx context.Context, st *store.Store, guild, youID string, now 
 	}
 	for _, g := range previewGames {
 		mp := g.mp
-		if err := st.SetGameDetails(ctx, steamPlatform, g.id, store.GameDetails{Multiplayer: &mp, Genres: g.genres, Reviews: g.reviews, ReleaseYear: 2020}, now); err != nil {
+		if err := st.SetGameDetails(ctx, steamPlatform, g.id, store.GameDetails{Multiplayer: &mp, Genres: g.genres, Reviews: g.reviews, ReleaseYear: max(g.year, 2020)}, now); err != nil {
 			return err
 		}
 	}
@@ -253,4 +273,11 @@ func (c *captureDiscord) lastPost() discord.ResponseData {
 	}
 	m := c.posts[len(c.posts)-1]
 	return discord.ResponseData{Content: m.Content, Embeds: m.Embeds, Components: m.Components, Flags: m.Flags}
+}
+
+func previewSecret(s string) []byte {
+	if s == "" {
+		s = strings.Repeat("p", 32)
+	}
+	return []byte(s)
 }

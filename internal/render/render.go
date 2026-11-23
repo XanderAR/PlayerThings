@@ -38,11 +38,16 @@ type Tile struct {
 	Minutes int
 }
 
-// Layouts: a 5x2 grid for /collage and a single row for profile cards.
+// Layouts: a 5x2 grid for /collage, a single row for profile cards, and a
+// collection board (5x2, no ranks, unplayed games dimmed).
 const (
 	Grid  = "grid"
 	Strip = "strip"
+	Set   = "set"
 )
+
+// ValidLayout reports whether l is a layout Shelf can draw.
+func ValidLayout(l string) bool { return l == Grid || l == Strip || l == Set }
 
 const (
 	tileW, tileH = 240, 360 // Steam library covers are 2:3
@@ -199,9 +204,13 @@ func (r *Renderer) Shelf(ctx context.Context, layout string, tiles []Tile) ([]by
 	if len(tiles) > cols*rows {
 		tiles = tiles[:cols*rows]
 	}
-	// Shrink a grid that isn't full, so a short library has no empty row.
+	// Shrink a grid that isn't full, so a short library has no empty row,
+	// and a short strip so it has no empty tiles.
 	if rows > 1 && len(tiles) <= cols {
 		rows = 1
+	}
+	if rows == 1 && len(tiles) < cols && len(tiles) > 0 {
+		cols = len(tiles)
 	}
 	canvas := image.NewRGBA(image.Rect(0, 0, gap+cols*(tileW+gap), gap+rows*(tileH+captionH+gap)))
 	draw.Draw(canvas, canvas.Bounds(), &image.Uniform{background}, image.Point{}, draw.Src)
@@ -216,8 +225,17 @@ func (r *Renderer) Shelf(ctx context.Context, layout string, tiles []Tile) ([]by
 		} else {
 			drawCover(canvas, cell, art[i])
 		}
-		if i < len(tiles) {
-			r.caption(canvas, image.Rect(x, y+tileH, x+tileW, y+tileH+captionH), i, tiles[i].Minutes)
+		if i >= len(tiles) {
+			continue
+		}
+		strip := image.Rect(x, y+tileH, x+tileW, y+tileH+captionH)
+		if layout == Set {
+			if tiles[i].Minutes == 0 {
+				draw.Draw(canvas, cell, &image.Uniform{color.NRGBA{0x12, 0x13, 0x15, 185}}, image.Point{}, draw.Over)
+			}
+			r.setCaption(canvas, strip, tiles[i].Minutes)
+		} else {
+			r.caption(canvas, strip, i, tiles[i].Minutes)
 		}
 	}
 
@@ -332,6 +350,18 @@ func (r *Renderer) caption(dst *image.RGBA, strip image.Rectangle, i, minutes in
 	w := font.MeasureString(r.small, rank).Ceil()
 	text(dst, r.small, rank, cx-w/2, cy+7, ink)
 	text(dst, r.big, hoursLabel(minutes), strip.Min.X+46, cy+10, color.White)
+}
+
+// setCaption marks a collection game as played (green dot and hours) or not.
+func (r *Renderer) setCaption(dst *image.RGBA, strip image.Rectangle, minutes int) {
+	draw.Draw(dst, strip, &image.Uniform{captionBG}, image.Point{}, draw.Src)
+	cy := strip.Min.Y + strip.Dy()/2
+	if minutes == 0 {
+		text(dst, r.small, "not played", strip.Min.X+16, cy+7, color.RGBA{0x8a, 0x8e, 0x96, 0xff})
+		return
+	}
+	circle(dst, strip.Min.X+22, cy, 8, color.RGBA{0x23, 0xa5, 0x5a, 0xff})
+	text(dst, r.big, hoursLabel(minutes), strip.Min.X+40, cy+10, color.White)
 }
 
 func circle(dst *image.RGBA, cx, cy, rad int, c color.Color) {

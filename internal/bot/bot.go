@@ -44,6 +44,8 @@ type Bot struct {
 	Links           Links
 	PlaytestsFile   string
 	PlaytestsSource string
+	CollectionsFile string // hand-picked game collections (data/collections.json)
+	MomentsFile     string // rare gaming-moment posts (data/moments.json)
 	Log             *slog.Logger
 	Now             func() time.Time
 	// EditDelay is the minimum wait before editing a deferred reply, so the
@@ -128,6 +130,10 @@ func (b *Bot) command(ctx context.Context, in *discord.Interaction) discord.Resp
 		return b.cmdTaste(ctx, in)
 	case "help":
 		return b.cmdHelp(ctx, in)
+	case "goty":
+		return b.cmdGOTY(ctx, in)
+	case "collection":
+		return b.cmdCollection(ctx, in)
 	}
 	return reply("I don't know that command yet.", true)
 }

@@ -1,0 +1,116 @@
+[
+  {
+    "slug": "goty",
+    "emoji": "🏆",
+    "title": "Game of the Year winners",
+    "blurb": "Every Game Awards winner you can play on Steam.",
+    "games": [
+      {"name": "The Witcher 3: Wild Hunt", "ids": ["292030"]},
+      {"name": "God of War", "ids": ["1593500"]},
+      {"name": "Sekiro: Shadows Die Twice", "ids": ["814380"]},
+      {"name": "The Last of Us Part II", "ids": ["2531310"]},
+      {"name": "It Takes Two", "ids": ["1426210"]},
+      {"name": "Elden Ring", "ids": ["1245620"]},
+      {"name": "Baldur's Gate 3", "ids": ["1086940"]},
+      {"name": "Clair Obscur: Expedition 33", "ids": ["1903340"]}
+    ]
+  },
+  {
+    "slug": "road-to-gta6",
+    "emoji": "🌴",
+    "title": "Road to GTA VI",
+    "blurb": "Every Rockstar open world on Steam, from Liberty City to Leonida's doorstep.",
+    "games": [
+      {"name": "Grand Theft Auto III", "ids": ["12100"]},
+      {"name": "Grand Theft Auto: Vice City", "ids": ["12110"]},
+      {"name": "Grand Theft Auto: San Andreas", "ids": ["12120"]},
+      {"name": "Grand Theft Auto IV", "ids": ["12210"]},
+      {"name": "Grand Theft Auto V", "ids": ["3240220", "271590"]},
+      {"name": "Red Dead Redemption", "ids": ["2668510"]},
+      {"name": "Red Dead Redemption 2", "ids": ["1174180"]}
+    ]
+  },
+  {
+    "slug": "learn-to-parry",
+    "emoji": "⚔️",
+    "title": "Learn to parry",
+    "blurb": "A soulslike starter pack, roughly in order of how much they'll hurt.",
+    "games": [
+      {"name": "Hollow Knight", "ids": ["367520"]},
+      {"name": "Dark Souls Remastered", "ids": ["570940"]},
+      {"name": "Dark Souls III", "ids": ["374320"]},
+      {"name": "Lies of P", "ids": ["1627720"]},
+      {"name": "Nioh 2", "ids": ["1325200"]},
+      {"name": "Sekiro: Shadows Die Twice", "ids": ["814380"]},
+      {"name": "Elden Ring", "ids": ["1245620"]}
+    ]
+  },
+  {
+    "slug": "coop-night",
+    "emoji": "🤝",
+    "title": "Co-op night essentials",
+    "blurb": "The games that turn a voice channel into a party.",
+    "games": [
+      {"name": "Deep Rock Galactic", "ids": ["548430"]},
+      {"name": "It Takes Two", "ids": ["1426210"]},
+      {"name": "Lethal Company", "ids": ["1966720"]},
+      {"name": "Helldivers 2", "ids": ["553850"]},
+      {"name": "Valheim", "ids": ["892970"]},
+      {"name": "Phasmophobia", "ids": ["739630"]},
+      {"name": "Left 4 Dead 2", "ids": ["550"]},
+      {"name": "Overcooked! 2", "ids": ["728880"]},
+      {"name": "Stardew Valley", "ids": ["413150"]},
+      {"name": "Risk of Rain 2", "ids": ["632360"]}
+    ]
+  },
+  {
+    "slug": "indie-hall-of-fame",
+    "emoji": "🌱",
+    "title": "Indie hall of fame",
+    "blurb": "Small teams, enormous games.",
+    "games": [
+      {"name": "Hollow Knight", "ids": ["367520"]},
+      {"name": "Celeste", "ids": ["504230"]},
+      {"name": "Hades", "ids": ["1145360"]},
+      {"name": "Stardew Valley", "ids": ["413150"]},
+      {"name": "Undertale", "ids": ["391540"]},
+      {"name": "Balatro", "ids": ["2379780"]},
+      {"name": "Outer Wilds", "ids": ["753640"]},
+      {"name": "Terraria", "ids": ["105600"]},
+      {"name": "Slay the Spire", "ids": ["646570"]},
+      {"name": "Disco Elysium", "ids": ["632470"]}
+    ]
+  },
+  {
+    "slug": "one-more-run",
+    "emoji": "🎲",
+    "title": "One more run",
+    "blurb": "Roguelikes that eat whole evenings.",
+    "games": [
+      {"name": "Hades", "ids": ["1145360"]},
+      {"name": "Slay the Spire", "ids": ["646570"]},
+      {"name": "Balatro", "ids": ["2379780"]},
+      {"name": "Dead Cells", "ids": ["588650"]},
+      {"name": "The Binding of Isaac: Rebirth", "ids": ["250900"]},
+      {"name": "Risk of Rain 2", "ids": ["632360"]},
+      {"name": "Enter the Gungeon", "ids": ["311690"]},
+      {"name": "Noita", "ids": ["881100"]}
+    ]
+  },
+  {
+    "slug": "valve-essentials",
+    "emoji": "🔧",
+    "title": "Valve essentials",
+    "blurb": "The studio that made Steam, and the games that made Valve.",
+    "games": [
+      {"name": "Half-Life", "ids": ["70"]},
+      {"name": "Half-Life 2", "ids": ["220"]},
+      {"name": "Portal", "ids": ["400"]},
+      {"name": "Portal 2", "ids": ["620"]},
+      {"name": "Left 4 Dead 2", "ids": ["550"]},
+      {"name": "Team Fortress 2", "ids": ["440"]},
+      {"name": "Counter-Strike 2", "ids": ["730"]},
+      {"name": "Half-Life: Alyx", "ids": ["546560"]}
+    ]
+  }
+]

@@ -73,7 +73,7 @@ func preview(cfg config.Config, args []string) {
 	}
 	defer os.RemoveAll(dir)
 	ctx := context.Background()
-	cards, err := bot.Preview(ctx, dir, cfg.PlaytestsFile, cfg.BaseURL, *you)
+	cards, err := bot.Preview(ctx, dir, bot.PreviewFiles{Playtests: cfg.PlaytestsFile, Collections: cfg.CollectionsFile, Moments: cfg.MomentsFile, LinkSecret: cfg.LinkSecret}, cfg.BaseURL, *you)
 	if err != nil {
 		fail("render preview", err)
 	}
@@ -167,6 +167,8 @@ func serve(cfg config.Config) {
 		Links:           bot.Links{Site: cfg.BaseURL, PlayerGG: cfg.PlayerGGURL},
 		PlaytestsFile:   cfg.PlaytestsFile,
 		PlaytestsSource: cfg.PlaytestsSource,
+		CollectionsFile: cfg.CollectionsFile,
+		MomentsFile:     cfg.MomentsFile,
 		Log:             log,
 		EditDelay:       500 * time.Millisecond,
 	}

@@ -320,6 +320,8 @@ func (b *Bot) cmdHelp(ctx context.Context, in *discord.Interaction) discord.Resp
 				"`/profile` your card: hours, top games, what you're playing\n"+
 				"`/iceberg` your games from mainstream to deep cuts\n"+
 				"`/collage` your top games in one grid\n"+
+				"`/goty` your Game of the Year race, then vote on player.gg\n"+
+				"`/collection` how much of a collection you've played\n"+
 				"`/game` one game: your hours and who here plays it"),
 			discord.Text("### This server\n"+
 				"`/whoplays` everyone here who owns a game\n"+

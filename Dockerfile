@@ -10,7 +10,7 @@ FROM alpine:3.22
 RUN apk add --no-cache ca-certificates
 WORKDIR /app
 COPY --from=build /out/playradar /app/playradar
-COPY data/playtests.json /app/data/playtests.json
+COPY data/playtests.json data/collections.json data/moments.json /app/data/
 # Mount a Railway volume at /data so the database survives deploys.
 ENV DATABASE_PATH=/data/playradar.db
 EXPOSE 8080

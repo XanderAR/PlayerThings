@@ -81,8 +81,8 @@ func TestShelf(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Three games fit one row, so the grid shrinks to a single row.
-	if b := img.Bounds(); b.Dx() != gap+5*(tileW+gap) || b.Dy() != gap+tileH+captionH+gap {
+	// Three games fit one row, so the grid shrinks to one row of three.
+	if b := img.Bounds(); b.Dx() != gap+3*(tileW+gap) || b.Dy() != gap+tileH+captionH+gap {
 		t.Fatalf("size = %v", b)
 	}
 	// Middle of tile 1 is the red cover; tile 2 uses the blue header.

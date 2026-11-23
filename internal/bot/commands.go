@@ -45,6 +45,25 @@ func Commands() []discord.Command {
 			IntegrationTypes: anyInstall, Contexts: everywhere,
 		},
 		{
+			Name: "goty", Description: "Your Game of the Year race: this year's releases you've played most",
+			Options: []discord.CommandOption{
+				{Type: discord.OptionString, Name: "scope", Description: "Yours or the whole server's", Choices: []discord.Choice{
+					{Name: "Mine", Value: "me"},
+					{Name: "This server", Value: "server"},
+				}},
+				player,
+			},
+			IntegrationTypes: anyInstall, Contexts: everywhere,
+		},
+		{
+			Name: "collection", Description: "How much of a game collection you've played, and who here is furthest along",
+			Options: []discord.CommandOption{
+				{Type: discord.OptionString, Name: "name", Description: "Which collection (leave empty to see them all)", Autocomplete: true},
+				player,
+			},
+			IntegrationTypes: anyInstall, Contexts: everywhere,
+		},
+		{
 			Name: "crowns", Description: "Games where you have the most hours in this server",
 			Options:          []discord.CommandOption{player},
 			IntegrationTypes: anyInstall, Contexts: serversOnly,

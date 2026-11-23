@@ -100,6 +100,7 @@ func (b *Bot) RunFeeds(ctx context.Context) {
 	defer t.Stop()
 	for {
 		b.postNewPlaytests(ctx)
+		b.postMoments(ctx)
 		b.postDueCharts(ctx)
 		select {
 		case <-ctx.Done():
@@ -286,12 +287,22 @@ func lastMondayTen(now time.Time) time.Time {
 // webhook was deleted in Discord. Only link buttons are kept: scheduled posts
 // don't need buttons that call back into the app.
 func (b *Bot) post(ctx context.Context, f store.Feed, data discord.ResponseData) error {
+	return b.postWith(ctx, f, data, false)
+}
+
+// postWith posts through a feed's webhook. interactive keeps buttons that call
+// back into the app, which works because the app created (owns) the webhook.
+func (b *Bot) postWith(ctx context.Context, f store.Feed, data discord.ResponseData, interactive bool) error {
+	comps := data.Components
+	if !interactive {
+		comps = linkButtonsOnly(comps)
+	}
 	msg := discord.WebhookMessage{
 		Username:        b.AppName,
 		AvatarURL:       b.AvatarURL,
 		Content:         data.Content,
 		Embeds:          data.Embeds,
-		Components:      linkButtonsOnly(data.Components),
+		Components:      comps,
 		Flags:           data.Flags & discord.FlagComponentsV2,
 		AllowedMentions: discord.NoPings(),
 	}

@@ -341,6 +341,20 @@ func (b *Bot) component(ctx context.Context, in *discord.Interaction) discord.Re
 		if len(parts) == 2 {
 			return b.whoPlaysReply(ctx, in, parts[1], true)
 		}
+	case "goty":
+		if !in.InGuild() {
+			return reply("The server race only works inside servers.", true)
+		}
+		data, err := b.serverGOTY(ctx, in.GuildID, b.now().Year())
+		if err != nil {
+			return b.oops(err, "server goty")
+		}
+		data.Flags |= discord.FlagEphemeral
+		return message(data)
+	case "col":
+		return b.collectionComponent(ctx, in, parts)
+	case "mo":
+		return b.momentComponent(ctx, in, parts)
 	}
 	return reply("That button has expired. Run the command again.", true)
 }
@@ -350,6 +364,18 @@ func (b *Bot) component(ctx context.Context, in *discord.Interaction) discord.Re
 func (b *Bot) autocomplete(ctx context.Context, in *discord.Interaction) discord.Response {
 	choices := []discord.Choice{}
 	focused, ok := in.Data.Focused()
+	if ok && focused.Name == "name" && in.Data.Name == "collection" {
+		list, _ := b.collections()
+		q := strings.ToLower(focused.StringValue())
+		for _, c := range list {
+			if q == "" || strings.Contains(strings.ToLower(c.Title), q) {
+				choices = append(choices, discord.Choice{Name: discord.Truncate(c.Emoji+" "+c.Title, 100), Value: c.Slug})
+			}
+			if len(choices) == 25 {
+				break
+			}
+		}
+	}
 	if ok && focused.Name == "game" {
 		query := focused.StringValue()
 		switch {

@@ -25,6 +25,8 @@ type Config struct {
 	DatabasePath     string
 	PlaytestsFile    string
 	PlaytestsSource  string // shown in the /playtests footer
+	CollectionsFile  string
+	MomentsFile      string
 	Contact          string // shown on the privacy page
 	SyncInterval     time.Duration
 	SteamDailyBudget int
@@ -46,6 +48,8 @@ func Load() (Config, error) {
 		DatabasePath:     env("DATABASE_PATH", "data/playradar.db"),
 		PlaytestsFile:    env("PLAYTESTS_FILE", "data/playtests.json"),
 		PlaytestsSource:  env("PLAYTESTS_SOURCE", "public playtest pages"),
+		CollectionsFile:  env("COLLECTIONS_FILE", "data/collections.json"),
+		MomentsFile:      env("MOMENTS_FILE", "data/moments.json"),
 		Contact:          env("CONTACT", ""),
 		PlayerGGURL:      strings.TrimRight(env("PLAYERGG_URL", "https://player.gg"), "/"),
 		AvatarURL:        env("AVATAR_URL", ""),

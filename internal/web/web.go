@@ -78,7 +78,7 @@ func (s *Server) Routes() http.Handler {
 func (s *Server) shelf(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	layout, games, sig := q.Get("l"), q.Get("g"), q.Get("s")
-	if s.Render == nil || (layout != render.Grid && layout != render.Strip) || !render.Verify(s.LinkSecret, layout, games, sig) {
+	if s.Render == nil || !render.ValidLayout(layout) || !render.Verify(s.LinkSecret, layout, games, sig) {
 		http.Error(w, "unknown image", http.StatusForbidden)
 		return
 	}

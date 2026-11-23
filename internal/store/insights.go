@@ -78,6 +78,55 @@ func (s *Store) Owned(ctx context.Context, discordID, platform, gameID string) (
 	return pg, err == nil, err
 }
 
+// YearGames returns a user's played games released in year, most played first.
+func (s *Store) YearGames(ctx context.Context, discordID, platform string, year, limit int) ([]PlayedGame, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT `+gameColumns+`, l.minutes_total, l.minutes_recent
+		FROM library l JOIN games g ON g.platform = l.platform AND g.game_id = l.game_id
+		WHERE l.discord_id = ? AND l.platform = ? AND l.minutes_total > 0 AND g.release_year = ?
+		ORDER BY l.minutes_total DESC, g.name LIMIT ?`, discordID, platform, year, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []PlayedGame
+	for rows.Next() {
+		var pg PlayedGame
+		if err := scanGame(rows, &pg.Game, &pg.MinutesTotal, &pg.MinutesRecent); err != nil {
+			return nil, err
+		}
+		out = append(out, pg)
+	}
+	return out, rows.Err()
+}
+
+// ServerYearGames ranks games released in year by total playtime among a
+// server's opted-in members. Minutes is all-time playtime; Players counts
+// members who have played it.
+func (s *Store) ServerYearGames(ctx context.Context, guildID, platform string, year, limit int) ([]ChartEntry, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT `+gameColumns+`, SUM(l.minutes_total) AS minutes, COUNT(*) AS players
+		FROM guild_visibility v
+		JOIN library l ON l.discord_id = v.discord_id AND l.platform = ?
+		JOIN games g ON g.platform = l.platform AND g.game_id = l.game_id
+		WHERE v.guild_id = ? AND v.visible = 1 AND l.minutes_total > 0 AND g.release_year = ?
+		GROUP BY g.platform, g.game_id
+		ORDER BY minutes DESC, players DESC LIMIT ?`, platform, guildID, year, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ChartEntry
+	for rows.Next() {
+		var c ChartEntry
+		if err := scanGame(rows, &c.Game, &c.Minutes, &c.Players); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
 // MemberValue is one member's score on a server leaderboard.
 type MemberValue struct {
 	DiscordID   string

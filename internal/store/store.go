@@ -174,7 +174,7 @@ func Open(path string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, s := range []string{schema, feedSchema} {
+	for _, s := range []string{schema, feedSchema, momentSchema} {
 		if _, err := db.Exec(s); err != nil {
 			db.Close()
 			return nil, fmt.Errorf("create schema: %w", err)
@@ -631,11 +631,16 @@ func (s *Store) SetMultiplayer(ctx context.Context, platform, gameID string, mul
 // DeleteUser removes everything stored about a Discord user.
 func (s *Store) DeleteUser(ctx context.Context, discordID string) error {
 	return s.tx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM accounts WHERE discord_id = ?`, discordID); err != nil {
-			return err
+		for _, q := range []string{
+			`DELETE FROM accounts WHERE discord_id = ?`,
+			`DELETE FROM guild_visibility WHERE discord_id = ?`,
+			`DELETE FROM moment_votes WHERE discord_id = ?`,
+		} {
+			if _, err := tx.ExecContext(ctx, q, discordID); err != nil {
+				return err
+			}
 		}
-		_, err := tx.ExecContext(ctx, `DELETE FROM guild_visibility WHERE discord_id = ?`, discordID)
-		return err
+		return nil
 	})
 }
 

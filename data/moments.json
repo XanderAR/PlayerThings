@@ -1,0 +1,36 @@
+[
+  {
+    "id": "gta6-launch",
+    "kicker": "🌴 Gaming moment",
+    "title": "GTA VI is finally here",
+    "body": "Grand Theft Auto VI launched on November 19 for PS5 and Xbox Series X|S, with no PC date yet. Steam can't see who's playing, so tell the server:",
+    "starts": "2026-11-19",
+    "ends": "2026-12-03",
+    "related_steam_apps": ["3240220", "271590", "1174180"],
+    "related_label": "GTA V and Red Dead Redemption 2",
+    "choices": [
+      {"id": "playing", "emoji": "🎮", "label": "I'm playing it"},
+      {"id": "waiting", "emoji": "⏳", "label": "Waiting for PC"},
+      {"id": "pass", "emoji": "🙅", "label": "Not for me"}
+    ],
+    "link_label": "Is it your GOTY? Vote on player.gg",
+    "link_url": "https://player.gg/goty",
+    "collection": "road-to-gta6"
+  },
+  {
+    "id": "tga-2026",
+    "kicker": "🏆 Gaming moment",
+    "title": "The Game Awards are this Thursday",
+    "body": "Geoff's back at the Peacock Theater on December 10. Before the envelopes open, how are you watching?",
+    "starts": "2026-12-07",
+    "ends": "2026-12-10",
+    "choices": [
+      {"id": "live", "emoji": "📺", "label": "Watching live"},
+      {"id": "trailers", "emoji": "🎬", "label": "Just the trailers"},
+      {"id": "results", "emoji": "📰", "label": "Results tomorrow"}
+    ],
+    "link_label": "Vote your GOTY on player.gg",
+    "link_url": "https://player.gg/goty",
+    "collection": "goty"
+  }
+]

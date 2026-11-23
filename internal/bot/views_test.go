@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -588,6 +589,107 @@ func TestWeeklyChartPostsOncePerWeek(t *testing.T) {
 		if b.Style != discord.ButtonLink {
 			t.Fatalf("scheduled post kept an app button: %+v", b)
 		}
+	}
+}
+
+// ----- goty, collections, moments -----
+
+func TestGOTY(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	yes := true
+	for _, id := range []string{"1145360", "1966720"} { // 2026 releases in this test
+		h.st.SetGameDetails(ctx, "steam", id, store.GameDetails{Multiplayer: &yes, ReleaseYear: 2026}, now)
+	}
+	h.send(t, cmd("goty", "G", "100", "0"))
+	h.b.Wait()
+	text := texts(valid(t, h.dc.edits[0]))
+	if !strings.Contains(text, "2026 GOTY race") || !strings.Contains(text, "🥇 **Hades II** · 96 h") || !strings.Contains(text, "🥈 **Lethal Company** · 17 h") {
+		t.Fatalf("goty = %s", text)
+	}
+	if !strings.Contains(string(mustJSON(h.dc.edits[0])), url.QueryEscape("https://player.gg/goty")) {
+		t.Fatal("no vote link to player.gg/goty")
+	}
+	r, _ := h.send(t, cmd("goty", "G", "100", "0", opt("scope", 3, "server")))
+	if text := texts(valid(t, messageData(t, r))); !strings.Contains(text, "This server's 2026 GOTY race") || !strings.Contains(text, "**Lethal Company** · 50 h · 2 players") {
+		t.Fatalf("server goty = %s", text)
+	}
+}
+
+func mustJSON(v any) []byte {
+	raw, _ := json.Marshal(v)
+	return raw
+}
+
+func (h *harness) dataFile(t *testing.T, name, content string) string {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), name)
+	os.WriteFile(p, []byte(content), 0o644)
+	return p
+}
+
+func TestCollections(t *testing.T) {
+	h := newHarness(t)
+	h.b.CollectionsFile = h.dataFile(t, "collections.json", `[
+	 {"slug":"coop","emoji":"🤝","title":"Co-op night","blurb":"Party games.","games":[
+	   {"name":"Deep Rock Galactic","ids":["548430"]},{"name":"Lethal Company","ids":["1966720"]},
+	   {"name":"Helldivers 2","ids":["553850","999"]},{"name":"Valheim","ids":["892970"]}]}]`)
+	r, _ := h.send(t, cmd("collection", "G", "100", "0"))
+	d := valid(t, messageData(t, r))
+	if text := texts(d); !strings.Contains(text, "🤝 **Co-op night**\n▰▰▰▰▰▱▱▱▱▱  2/4") {
+		t.Fatalf("overview = %s", text)
+	}
+	r, _ = h.send(t, cmd("collection", "G", "200", "0", opt("name", 3, "coop")))
+	d = valid(t, messageData(t, r))
+	text := texts(d)
+	if !strings.Contains(text, "has played 3 of 4") || !strings.Contains(text, "**Still to play:** Valheim") ||
+		!strings.Contains(text, "🥇 <@200> 3/4") || !strings.Contains(text, "🥈 <@100> 2/4") {
+		t.Fatalf("collection = %s", text)
+	}
+	var board string
+	walk(d.Components, func(c discord.Component) {
+		if c.Type == discord.ComponentMediaGallery {
+			board = c.Items[0].Media.URL
+		}
+	})
+	if !strings.Contains(board, "l=set&g=548430.17280-1966720.2000-553850.6000-892970.0") {
+		t.Fatalf("collection board url missing: %s", mustJSON(d))
+	}
+	r, _ = h.send(t, click("300", "G", "col:300", "coop"))
+	if d := valid(t, messageData(t, r)); d.Flags&discord.FlagEphemeral == 0 || !strings.Contains(texts(d), "has played 1 of 4") {
+		t.Fatalf("menu pick = %s", texts(d))
+	}
+}
+
+func TestMomentPostsOnceAndCountsVotes(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.b.MomentsFile = h.dataFile(t, "moments.json", `[{"id":"launch","kicker":"🌴 Gaming moment","title":"Big game is out",
+	  "body":"It's out.","starts":"2026-11-20","ends":"2026-11-30","related_steam_apps":["548430"],"related_label":"Deep Rock Galactic",
+	  "choices":[{"id":"playing","emoji":"🎮","label":"I'm playing it"},{"id":"pass","emoji":"🙅","label":"Not for me"}],
+	  "link_label":"Vote on player.gg","link_url":"https://player.gg/goty"}]`)
+	h.st.SetFeed(ctx, store.Feed{GuildID: "G", Kind: store.FeedRadar, ChannelID: "C1", WebhookID: "w", WebhookToken: "t", CreatedBy: "100", CreatedAt: now})
+	h.b.postMoments(ctx)
+	h.b.postMoments(ctx)
+	if len(h.dc.posts) != 1 {
+		t.Fatalf("moment posts = %d, want exactly one", len(h.dc.posts))
+	}
+	post := valid(t, postData(h.dc.posts[0]))
+	if text := texts(post); !strings.Contains(text, "## Big game is out") || !strings.Contains(text, "**3 members here** have **840 h** in Deep Rock Galactic") {
+		t.Fatalf("moment = %s", text)
+	}
+	if !hasCustomID(post, "mo:launch:playing") {
+		t.Fatal("moment post lost its answer buttons")
+	}
+	h.send(t, click("200", "G", "mo:launch:playing"))
+	r, _ := h.send(t, click("300", "G", "mo:launch:playing"))
+	if r.Type != discord.ResponseUpdateMessage || !strings.Contains(texts(messageData(t, r)), "🎮 **2** i'm playing it") {
+		t.Fatalf("tally = %s", texts(messageData(t, r)))
+	}
+	// Unlinking removes your vote.
+	h.st.DeleteUser(ctx, "300")
+	if counts, _ := h.st.VoteCounts(ctx, "G", "launch"); counts["playing"] != 1 {
+		t.Fatalf("votes after unlink = %v", counts)
 	}
 }
 
