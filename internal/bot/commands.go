@@ -80,6 +80,11 @@ func Commands() []discord.Command {
 			IntegrationTypes: anyInstall, Contexts: everywhere,
 		},
 		{
+			Name: "backlog", Description: "Your pile of shame: games you own but never launched, and one to play tonight",
+			Options:          []discord.CommandOption{player},
+			IntegrationTypes: anyInstall, Contexts: everywhere,
+		},
+		{
 			Name: "crowns", Description: "Games where you have the most hours in this server",
 			Options:          []discord.CommandOption{player},
 			IntegrationTypes: anyInstall, Contexts: serversOnly,
@@ -92,6 +97,7 @@ func Commands() []discord.Command {
 					{Name: "Last 2 weeks", Value: "recent"},
 					{Name: "Games played", Value: "games"},
 					{Name: "Crowns", Value: "crowns"},
+					{Name: "Pile of shame (never launched)", Value: "backlog"},
 				}},
 			},
 			IntegrationTypes: anyInstall, Contexts: serversOnly,

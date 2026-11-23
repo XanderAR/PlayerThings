@@ -145,8 +145,8 @@ const visibleLibraries = `
 	WHERE v.guild_id = ? AND v.visible = 1`
 
 // Leaderboard ranks a server's opted-in members. kind is "hours" (all-time
-// playtime in minutes), "recent" (last two weeks, in minutes) or "games"
-// (games played).
+// playtime in minutes), "recent" (last two weeks, in minutes), "games"
+// (games played) or "backlog" (games owned but never played).
 func (s *Store) Leaderboard(ctx context.Context, guildID, platform, kind string, limit int) ([]MemberValue, error) {
 	var agg string
 	switch kind {
@@ -156,6 +156,8 @@ func (s *Store) Leaderboard(ctx context.Context, guildID, platform, kind string,
 		agg = "SUM(minutes_recent)"
 	case "games":
 		agg = "SUM(CASE WHEN minutes_total > 0 THEN 1 ELSE 0 END)"
+	case "backlog":
+		agg = "SUM(CASE WHEN minutes_total = 0 THEN 1 ELSE 0 END)"
 	default:
 		return nil, fmt.Errorf("unknown leaderboard %q", kind)
 	}

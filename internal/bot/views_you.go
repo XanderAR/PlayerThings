@@ -339,6 +339,7 @@ func (b *Bot) cmdHelp(ctx context.Context, in *discord.Interaction) discord.Resp
 				"`/profile` your card: hours, top games, what you're playing\n"+
 				"`/four` your four favorite games, and who here shares them\n"+
 				"`/verdict` the court judges your gaming habits\n"+
+				"`/backlog` games you own but never launched, and one to play tonight\n"+
 				"`/iceberg` your games from mainstream to deep cuts\n"+
 				"`/collage` your top games in one grid\n"+
 				"`/goty` your Game of the Year race, then vote on player.gg\n"+

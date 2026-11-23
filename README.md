@@ -15,6 +15,7 @@ This is an independent proof of concept. It uses only public Steam data and publ
 | `/iceberg [player]` | Your 40 most-played games sorted into tiers by Steam review count, with a depth score |
 | `/four [player] [first..fourth]` | Four favorites: four covers with your hours, and who in the server shares them. With no games given, a menu of your most played |
 | `/verdict [player]` | A roast from real stats: an archetype, three lines of evidence and a playtest "sentence". The accused can appeal; anyone can press Judge me |
+| `/backlog [player]` | Pile of shame: the share of your Steam library never launched, the best-known unplayed games as covers, your rank in the server, and a rerollable pick for tonight |
 | `/collage [player] [period]` | Your top 9 games as a cover grid, all time or the last 2 weeks |
 | `/whoplays <game>` | Opted-in members ranked by hours, with a crown for the top player. Game names autocomplete |
 | `/leaderboard [type]` | Server ranking by hours, last 2 weeks, games played or crowns, with tabs to switch |

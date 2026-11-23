@@ -370,6 +370,8 @@ func (b *Bot) component(ctx context.Context, in *discord.Interaction) discord.Re
 		return b.verdictComponent(ctx, in, parts)
 	case "four":
 		return b.fourComponent(ctx, in, parts)
+	case "bl":
+		return b.backlogComponent(ctx, in, parts)
 	}
 	return reply("That button has expired. Run the command again.", true)
 }

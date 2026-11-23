@@ -122,6 +122,8 @@ func Preview(ctx context.Context, dir string, files PreviewFiles, siteURL, youID
 	run("/four", command("four"))
 	run("/verdict", command("verdict"))
 	run("/verdict → Appeal", clickOn("vd:a:"+youID))
+	run("/backlog", command("backlog"))
+	run("/backlog → Pick another", clickOn(fmt.Sprintf("bl:r:%s:%d:1", youID, backlogSeed(youID, now))))
 	if ms, err := b.moments(); err == nil && len(ms) > 0 {
 		if data, err := b.momentCard(ctx, ms[0], guild); err == nil {
 			cards = append(cards, PreviewCard{"Moment post", data})
@@ -194,7 +196,8 @@ func seedPreview(ctx context.Context, st *store.Store, guild, youID string, now 
 	}{
 		{youID, "Alex", []play{{"548430", 412, 6}, {"730", 301, 0}, {"427520", 260, 0}, {"646570", 150, 0}, {"413150", 120, 0},
 			{"2379780", 85, 9}, {"1267910", 70, 0}, {"1102190", 60, 0}, {"1434950", 40, 0}, {"1092790", 30, 5},
-			{"887570", 25, 0}, {"1782120", 18, 0}, {"1127500", 12, 0}}},
+			{"887570", 25, 0}, {"1782120", 18, 0}, {"1127500", 12, 0},
+			{"230410", 0, 0}, {"1085660", 0, 0}, {"2221490", 0, 0}}},
 		{previewMara, "Mara", []play{{"230410", 600, 0}, {"427520", 400, 0}, {"2221490", 300, 20}, {"548430", 288, 11},
 			{"413150", 50, 0}, {"2379780", 20, 14}}},
 		{previewTheo, "Theo", []play{{"1085660", 250, 8}, {"413150", 200, 0}, {"548430", 140, 0}, {"2379780", 120, 15}, {"646570", 90, 0}}},

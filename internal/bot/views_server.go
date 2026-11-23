@@ -375,6 +375,7 @@ var boardKinds = []boardKind{
 	{"recent", "Last 2 weeks", "Most played lately"},
 	{"games", "Games played", "Most games played"},
 	{"crowns", "Crowns", "Most crowns"},
+	{"backlog", "Pile of shame", "Most games never launched"},
 }
 
 func findBoard(key string) boardKind {
@@ -432,6 +433,8 @@ func (b *Bot) leaderboardCard(ctx context.Context, guildID, viewer, key string) 
 			return thousands(v) + " " + plural(v, "game", "games")
 		case "crowns":
 			return thousands(v) + " 👑"
+		case "backlog":
+			return thousands(v) + " never launched"
 		}
 		return hours(v)
 	}
