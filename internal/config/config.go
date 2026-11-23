@@ -130,10 +130,19 @@ func LoadDotEnv(path string) error {
 }
 
 func env(key, fallback string) string {
-	if v, ok := os.LookupEnv(key); ok && strings.TrimSpace(v) != "" {
-		return strings.TrimSpace(v)
+	if v, ok := os.LookupEnv(key); ok {
+		if v = clean(v); v != "" {
+			return v
+		}
 	}
 	return fallback
+}
+
+// clean trims whitespace and byte-order marks. Values piped into a CLI from
+// Windows PowerShell can pick up a leading U+FEFF, which TrimSpace keeps and
+// which makes keys fail (Steam answers 403).
+func clean(v string) string {
+	return strings.Trim(v, " \t\r\n\uFEFF")
 }
 
 func missingKeys(values map[string]string) []string {
