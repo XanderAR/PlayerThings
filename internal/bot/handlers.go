@@ -360,6 +360,7 @@ func (b *Bot) component(ctx context.Context, in *discord.Interaction) discord.Re
 		if err != nil {
 			return b.oops(err, "server goty")
 		}
+		data = b.withNudge(ctx, in, data)
 		data.Flags |= discord.FlagEphemeral
 		return message(data)
 	case "col":
@@ -372,6 +373,8 @@ func (b *Bot) component(ctx context.Context, in *discord.Interaction) discord.Re
 		return b.fourComponent(ctx, in, parts)
 	case "bl":
 		return b.backlogComponent(ctx, in, parts)
+	case "nudge":
+		return b.nudgeComponent(in)
 	}
 	return reply("That button has expired. Run the command again.", true)
 }

@@ -41,7 +41,7 @@ func (b *Bot) cmdGOTY(ctx context.Context, in *discord.Interaction) discord.Resp
 		if err != nil {
 			return b.oops(err, "server goty")
 		}
-		return message(data)
+		return message(b.withNudge(ctx, in, data))
 	}
 	target, self, stop := b.target(ctx, in, "player")
 	if stop != nil {

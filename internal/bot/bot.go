@@ -55,6 +55,9 @@ type Bot struct {
 	EditDelay time.Duration
 
 	wg sync.WaitGroup
+
+	nudgeMu  sync.Mutex
+	nudgedAt map[string]time.Time // last invite post per server
 }
 
 // maxRequestAge is how far a request's signed timestamp may be from now.

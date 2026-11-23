@@ -155,7 +155,7 @@ func (b *Bot) gameCard(ctx context.Context, in *discord.Interaction, game store.
 	if in.InGuild() {
 		buttons = append(buttons, discord.Button(discord.ButtonSecondary, "Who plays it here", "wp:"+game.GameID))
 	}
-	return card(false, discord.Container(colorAccent, parts...), discord.ActionRow(buttons...)), nil
+	return b.withNudge(ctx, in, card(false, discord.Container(colorAccent, parts...), discord.ActionRow(buttons...))), nil
 }
 
 // ----- /iceberg -----

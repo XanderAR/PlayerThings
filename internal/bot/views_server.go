@@ -33,7 +33,7 @@ func (b *Bot) cmdWhoPlays(ctx context.Context, in *discord.Interaction) discord.
 	if err != nil {
 		return b.oops(err, "who plays")
 	}
-	return message(data)
+	return message(b.withNudge(ctx, in, data))
 }
 
 // whoPlaysReply answers the "Who plays" button on a game card, privately.
@@ -52,6 +52,7 @@ func (b *Bot) whoPlaysReply(ctx context.Context, in *discord.Interaction, gameID
 	if err != nil {
 		return b.oops(err, "who plays")
 	}
+	data = b.withNudge(ctx, in, data)
 	if ephemeral {
 		data.Flags |= discord.FlagEphemeral
 	}
@@ -266,9 +267,10 @@ func (b *Bot) cmdChart(ctx context.Context, in *discord.Interaction) discord.Res
 		return b.oops(err, "server chart")
 	}
 	if !ok {
-		return reply("Nothing to chart yet: nobody who linked here has played on Steam in the last two weeks. Members can join with `/link`.", true)
+		return message(b.withNudge(ctx, in, notice(true, colorMuted, "📈 Nothing to chart yet",
+			"Nobody who linked here has played on Steam in the last two weeks. Members can join with `/link`.")))
 	}
-	return message(data)
+	return message(b.withNudge(ctx, in, data))
 }
 
 // chartMessage builds the server chart. ok is false when there's nothing to show.
@@ -357,10 +359,10 @@ func (b *Bot) cmdCrowns(ctx context.Context, in *discord.Interaction) discord.Re
 		parts = append(parts, note(fmt.Sprintf("Showing the top %d by hours", len(crowns))))
 	}
 	parts = append(parts, line(), note("Most hours in a game here wins its crown (1 h minimum). Pass the holder to take it."))
-	return message(card(false,
+	return message(b.withNudge(ctx, in, card(false,
 		discord.Container(colorGold, parts...),
 		discord.ActionRow(discord.Button(discord.ButtonSecondary, "Crown leaderboard", "lb:open:crowns")),
-	))
+	)))
 }
 
 // ----- /leaderboard -----
@@ -392,7 +394,7 @@ func (b *Bot) cmdLeaderboard(ctx context.Context, in *discord.Interaction) disco
 	if err != nil {
 		return b.oops(err, "leaderboard")
 	}
-	return message(data)
+	return message(b.withNudge(ctx, in, data))
 }
 
 // leaderboardComponent handles lb:set:<kind> (switch tabs on this message)
@@ -405,6 +407,7 @@ func (b *Bot) leaderboardComponent(ctx context.Context, in *discord.Interaction,
 	if err != nil {
 		return b.oops(err, "leaderboard")
 	}
+	data = b.withNudge(ctx, in, data)
 	if parts[1] == "open" {
 		data.Flags |= discord.FlagEphemeral
 		return message(data)
