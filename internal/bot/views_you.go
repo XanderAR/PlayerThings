@@ -251,6 +251,9 @@ func (b *Bot) icebergCard(name string, self bool, games []store.PlayedGame, guil
 	comps := []discord.Component{
 		discord.Text(fmt.Sprintf("## 🧊 %s's gaming iceberg\n-# %d most-played games, from the ones everyone knows to the deep cuts", name, len(games))),
 	}
+	if age, ok := gamingAge(games); ok {
+		comps = append(comps, discord.Text(fmt.Sprintf("### 🎂 Gaming age: %d\n-# The release year of these games, weighted by hours played", age)))
+	}
 	for i, t := range icebergTiers {
 		if len(buckets[i]) == 0 {
 			continue
@@ -266,6 +269,22 @@ func (b *Bot) icebergCard(name string, self bool, games []store.PlayedGame, guil
 	comps = append(comps, discord.Text(foot),
 		discord.ActionRow(discord.LinkButton("Build your shelf on player.gg", b.Links.Go(b.Links.Join(), "iceberg", guildID))))
 	return card(false, comps...)
+}
+
+// gamingAge is the release year of someone's games, weighted by hours (the
+// gaming take on Spotify's "listening age"). ok is false without years.
+func gamingAge(games []store.PlayedGame) (int, bool) {
+	var sum, weight float64
+	for _, g := range games {
+		if g.ReleaseYear > 0 && g.MinutesTotal > 0 {
+			sum += float64(g.ReleaseYear) * float64(g.MinutesTotal)
+			weight += float64(g.MinutesTotal)
+		}
+	}
+	if weight == 0 {
+		return 0, false
+	}
+	return int(sum/weight + 0.5), true
 }
 
 // ----- /collage -----

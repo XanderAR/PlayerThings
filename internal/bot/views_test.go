@@ -396,6 +396,9 @@ func TestIceberg(t *testing.T) {
 	if strings.Contains(text, "The abyss") {
 		t.Fatal("empty tiers should be left out")
 	}
+	if !strings.Contains(text, "### 🎂 Gaming age: 2020") {
+		t.Fatalf("no gaming age: %s", text)
+	}
 }
 
 func TestCollage(t *testing.T) {
