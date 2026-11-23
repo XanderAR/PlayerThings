@@ -401,14 +401,16 @@ func TestCollage(t *testing.T) {
 	h := newHarness(t)
 	r, _ := h.send(t, cmd("collage", "", "100", ""))
 	d := valid(t, messageData(t, r))
-	var items int
+	var img string
 	walk(d.Components, func(c discord.Component) {
-		if c.Type == discord.ComponentMediaGallery {
-			items = len(c.Items)
+		if c.Type == discord.ComponentMediaGallery && len(c.Items) == 1 {
+			img = c.Items[0].Media.URL
 		}
 	})
-	if items != 4 || !strings.Contains(texts(d), "**1** Deep Rock Galactic · **2** Counter-Strike 2") {
-		t.Fatalf("collage = %d items, %s", items, texts(d))
+	// One drawn shelf of covers, ranked by hours.
+	if !strings.HasPrefix(img, "https://bot.example/render/shelf.jpg?l=grid&g=548430.24720-730.18060-1145360.5760-1966720.1000&s=") ||
+		!strings.Contains(texts(d), "**1** Deep Rock Galactic · **2** Counter-Strike 2") {
+		t.Fatalf("collage = %s, %s", img, texts(d))
 	}
 }
 

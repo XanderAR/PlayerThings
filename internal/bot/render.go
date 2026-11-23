@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"playradar/internal/discord"
+	"playradar/internal/render"
 	"playradar/internal/store"
 )
 
@@ -56,6 +57,27 @@ func steamStore(appID string) string { return "https://store.steampowered.com/ap
 // one for every app, generating it from the store art when needed.
 func coverURL(appID string) string {
 	return "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/" + appID + "/library_600x900.jpg"
+}
+
+// shelf is a gallery holding one drawn image of game covers with ranks and
+// hours: a 5x2 grid, or a single row. ok is false when there are no games.
+func (b *Bot) shelf(layout string, games []store.PlayedGame, recent bool) (discord.Component, bool) {
+	var tiles []render.Tile
+	for _, g := range games {
+		if g.Platform != steamPlatform {
+			continue
+		}
+		m := g.MinutesTotal
+		if recent {
+			m = g.MinutesRecent
+		}
+		tiles = append(tiles, render.Tile{AppID: g.GameID, Minutes: m})
+	}
+	if len(tiles) == 0 {
+		return discord.Component{}, false
+	}
+	url := render.ShelfURL(b.Links.Site, b.LinkSecret, layout, tiles)
+	return discord.Gallery(discord.MediaItem{Media: discord.Media{URL: url}}), true
 }
 
 func mention(id string) string { return "<@" + id + ">" }

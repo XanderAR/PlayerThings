@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"playradar/internal/linktoken"
+	"playradar/internal/render"
 	"playradar/internal/store"
 )
 
@@ -41,6 +42,7 @@ type Server struct {
 	Syncer       Syncer
 	LinkSecret   []byte
 	Interactions http.Handler
+	Render       *render.Renderer // draws cover shelves; nil disables /render
 	Log          *slog.Logger
 	Now          func() time.Time
 }
@@ -55,8 +57,35 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /go", s.goRedirect)
 	mux.HandleFunc("GET /privacy", s.privacy)
 	mux.HandleFunc("GET /terms", s.terms)
+	mux.HandleFunc("GET /render/shelf.jpg", s.shelf)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	return securityHeaders(mux)
+}
+
+// shelf draws a signed cover shelf. The URL holds everything needed, so the
+// image never changes and Discord can cache it for good.
+func (s *Server) shelf(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	layout, games, sig := q.Get("l"), q.Get("g"), q.Get("s")
+	if s.Render == nil || (layout != render.Grid && layout != render.Strip) || !render.Verify(s.LinkSecret, layout, games, sig) {
+		http.Error(w, "unknown image", http.StatusForbidden)
+		return
+	}
+	tiles, err := render.Decode(games)
+	if err != nil {
+		http.Error(w, "unknown image", http.StatusBadRequest)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+	img, err := s.Render.Shelf(ctx, layout, tiles)
+	if err != nil {
+		s.serverError(w, "render shelf", err)
+		return
+	}
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	w.Write(img)
 }
 
 func (s *Server) callbackURL(token string) string {

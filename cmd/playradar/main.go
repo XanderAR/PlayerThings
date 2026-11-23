@@ -23,6 +23,7 @@ import (
 	"playradar/internal/bot"
 	"playradar/internal/config"
 	"playradar/internal/discord"
+	"playradar/internal/render"
 	"playradar/internal/steam"
 	"playradar/internal/store"
 	"playradar/internal/syncer"
@@ -180,6 +181,7 @@ func serve(cfg config.Config) {
 		Syncer:       sync,
 		LinkSecret:   []byte(cfg.LinkSecret),
 		Interactions: b,
+		Render:       render.New(),
 		Log:          log,
 	}
 

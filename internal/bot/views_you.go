@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"playradar/internal/discord"
+	"playradar/internal/render"
 	"playradar/internal/store"
 )
 
@@ -279,7 +280,7 @@ func (b *Bot) cmdCollage(ctx context.Context, in *discord.Interaction) discord.R
 		return *stop
 	}
 	recent := in.Data.StringOption("period") == "recent"
-	games, err := b.Store.TopGames(ctx, target.ID, steamPlatform, recent, 9)
+	games, err := b.Store.TopGames(ctx, target.ID, steamPlatform, recent, 10)
 	if err != nil {
 		return b.oops(err, "collage games")
 	}
@@ -288,7 +289,7 @@ func (b *Bot) cmdCollage(ctx context.Context, in *discord.Interaction) discord.R
 	if recent {
 		sub = "Last 2 weeks, by hours played"
 	}
-	gallery, ok := gameGallery(games, 9, true)
+	gallery, ok := b.shelf(render.Grid, games, recent)
 	if !ok {
 		return message(notice(true, colorMuted, "🖼️ "+name+"'s top games", "Nothing to show for this period yet."))
 	}

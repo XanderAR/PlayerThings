@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"playradar/internal/linktoken"
+	"playradar/internal/render"
 	"playradar/internal/store"
 )
 
@@ -58,6 +59,24 @@ func get(t *testing.T, s *Server, path string) *httptest.ResponseRecorder {
 	rec := httptest.NewRecorder()
 	s.Routes().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
 	return rec
+}
+
+func TestShelfImageNeedsAValidSignature(t *testing.T) {
+	s, _ := newServer(t, fakeSteam{}, fakeSyncer{})
+	art := httptest.NewServer(http.NotFoundHandler()) // no art: tiles render empty
+	defer art.Close()
+	s.Render = render.New()
+	s.Render.Cover = func(id string) string { return art.URL + "/c/" + id }
+	s.Render.Fallback = func(id string) string { return art.URL + "/h/" + id }
+
+	url := render.ShelfURL("", s.LinkSecret, render.Strip, []render.Tile{{AppID: "548430", Minutes: 600}})
+	rec := get(t, s, url)
+	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/jpeg" || rec.Body.Len() < 1000 {
+		t.Fatalf("shelf = %d %s (%d bytes)", rec.Code, rec.Header().Get("Content-Type"), rec.Body.Len())
+	}
+	if rec := get(t, s, strings.Replace(url, "548430.600", "548430.601", 1)); rec.Code != http.StatusForbidden {
+		t.Fatalf("tampered shelf = %d", rec.Code)
+	}
 }
 
 func TestGoRedirectOnlyAllowsPlayerGG(t *testing.T) {

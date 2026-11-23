@@ -9,6 +9,7 @@ import (
 
 	"playradar/internal/discord"
 	"playradar/internal/linktoken"
+	"playradar/internal/render"
 	"playradar/internal/store"
 )
 
@@ -211,7 +212,7 @@ func (b *Bot) profileCard(ctx context.Context, in *discord.Interaction, target d
 	if len(recent) > 0 {
 		parts = append(parts, discord.Text("### Playing lately\n"+recentLines(recent)))
 	}
-	if g, ok := gameGallery(top, 3, false); ok {
+	if g, ok := b.shelf(render.Strip, top, false); ok {
 		parts = append(parts, g)
 	}
 	if acct.SyncedAt.IsZero() {
