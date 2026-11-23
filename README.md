@@ -71,9 +71,11 @@ You need to do these steps yourself, because they create accounts and keys.
    go run ./cmd/playradar register
    ```
 
-6. **Add playtests.** Copy `data/playtests.example.json` to `data/playtests.json` and fill it from public player.gg playtest pages.
+6. **Add playtests.** `data/playtests.json` holds the list. It was filled on 2026-11-23 from the playtests with dates on <https://player.gg/playtests?upcoming=1>, so refresh it by hand as tests end.
+   - `url` is the game's Playtest tab on player.gg (`.../explore/games/<slug>/playtest`).
    - `similar_steam_apps` drives the "N members here play games like X" line.
-   - The file is built into the image, so redeploy after editing.
+   - Write summaries in your own words, one short line each.
+   - `go test ./...` checks the file, and it's built into the image, so pushing it redeploys.
 
 Once the bot is in more than 100 servers, Discord requires app verification, which includes an identity check.
 

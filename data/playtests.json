@@ -1,1 +1,122 @@
-[]
+[
+  {
+    "title": "Zlin City: Diorama",
+    "studio": "polyperfect",
+    "url": "https://player.gg/explore/games/304008-zlin-city-arch-moderna/playtest",
+    "image": "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/3017770/59ffc1fb003ffd1f7165271a050dcd1f5050a755/capsule_616x353.jpg?t=1794815315",
+    "summary": "Cozy diorama city builder: lay out miniature 1920s-style towns and model railways.",
+    "platforms": ["PC"],
+    "genres": ["City builder", "Simulation", "Casual"],
+    "starts": "2026-11-17",
+    "ends": "2026-12-19",
+    "similar_steam_apps": ["1291340", "255710", "1127500"]
+  },
+  {
+    "title": "Rimba: Keeper of Borneo",
+    "studio": "Arsanesia",
+    "url": "https://player.gg/explore/games/5450400.steam-rimba-keeper-of-borneo/playtest",
+    "image": "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/5450400/0ac8dd326e88b0406c1d983ddf007e6467410998/capsule_616x353.jpg?t=1795157519",
+    "summary": "Short cozy survival game about protecting Borneo's rainforest and its animals from wildfires.",
+    "platforms": ["PC", "Mac"],
+    "genres": ["Survival", "Casual", "Indie"],
+    "starts": "2026-11-11",
+    "ends": "2026-11-24",
+    "similar_steam_apps": ["413150", "322330"]
+  },
+  {
+    "title": "Throw Weight: Fleet Doctrine",
+    "studio": "Slow Boat Games",
+    "url": "https://player.gg/explore/games/428490-throw-weight/playtest",
+    "image": "https://assets-game.firstlook.gg/2594/35916f23-2ca4-4e18-b034-4347cf619a23.png",
+    "summary": "Hard sci-fi fleet tactics built on missiles, point defense and electronic warfare, with no shields or lasers.",
+    "platforms": ["PC"],
+    "genres": ["Strategy", "Tactics", "Sci-fi"],
+    "starts": "2026-10-29",
+    "ends": "2026-11-30",
+    "similar_steam_apps": ["887570", "1434950", "281990"]
+  },
+  {
+    "title": "Kardaviik",
+    "studio": "Vinyl Studios",
+    "url": "https://player.gg/explore/games/267847-kardashev/playtest",
+    "image": "https://assets-game.firstlook.gg/2888/e1bea544-0ff8-4a98-9a99-87ea4eead805.jpg",
+    "summary": "Factory automation in a voxel asteroid belt: mine, link production lines and expand in any direction.",
+    "platforms": ["PC", "Mac", "Linux"],
+    "genres": ["Automation", "Simulation", "Strategy"],
+    "starts": "2026-11-04",
+    "ends": "2027-03-01",
+    "similar_steam_apps": ["526870", "427520", "1366540", "244850"]
+  },
+  {
+    "title": "BEASTOPIA: RAIDERS",
+    "studio": "OFFMOON Inc.",
+    "url": "https://player.gg/explore/games/4867740.steam-beastopia-raiders/playtest",
+    "image": "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/4867740/6fed33c4764ca91135e2c927797dac8de6839ed7/capsule_616x353_alt_assets_0.jpg?t=1794811909",
+    "summary": "2D PvPvE extraction shooter: raid ruined cities as animal scavengers and get out with the loot.",
+    "platforms": ["PC", "Mac"],
+    "genres": ["Shooter", "Extraction", "Multiplayer"],
+    "starts": "2026-12-04",
+    "ends": "2026-12-06",
+    "similar_steam_apps": ["1782120", "1808500", "594650"]
+  },
+  {
+    "title": "The Final Lane",
+    "studio": "Bewtarious Games, Dumb Duck Games",
+    "url": "https://player.gg/explore/games/420937-the-final-lane/playtest",
+    "image": "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/4506540/1a06dc48b17f333c8c9ae06aa14dadc1c6a599ea/capsule_616x353.jpg?t=1794940956",
+    "summary": "Deckbuilding roguelite set in a bowling league in Hell, where the bowling balls are your cards.",
+    "platforms": ["PC"],
+    "genres": ["Roguelite", "Deckbuilder", "Sports"],
+    "starts": "2026-11-05",
+    "ends": "2026-11-30",
+    "similar_steam_apps": ["2379780", "646570", "1092790"]
+  },
+  {
+    "title": "Night Machine",
+    "studio": "Cooler Game Studios, Caketown Interactive",
+    "url": "https://player.gg/explore/games/308033-night-machine/playtest",
+    "image": "https://assets-game.firstlook.gg/2358/287e52b9-6b3f-48bc-b502-f71dbf2c2d83.png",
+    "summary": "Real-time card battler: pilot a ship into the Moon's alien factory and chain combos under pressure.",
+    "platforms": ["PC"],
+    "genres": ["Card game", "Strategy", "Indie"],
+    "starts": "2026-11-21",
+    "ends": "2026-11-27",
+    "similar_steam_apps": ["646570", "1102190", "2379780"]
+  },
+  {
+    "title": "When Sirens Fall Silent",
+    "studio": "LKA, Wired Productions",
+    "url": "https://player.gg/explore/games/380417-when-sirens-fall-silent/playtest",
+    "image": "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/2600920/d27ca30ffeed76adf02940c2ed5da47b4f2c3cf2/capsule_616x353.jpg?t=1792153726",
+    "summary": "Psychological thriller in 1990s Italy, following a troubled policewoman through a kidnapping and murder case.",
+    "platforms": ["PC"],
+    "genres": ["Thriller", "Adventure", "Story-driven"],
+    "starts": "2026-11-12",
+    "ends": "2026-11-30",
+    "similar_steam_apps": ["2124490", "632470", "960910"]
+  },
+  {
+    "title": "ClickCrafter",
+    "studio": "onewinter games",
+    "url": "https://player.gg/explore/games/413740-clickcrafter/playtest",
+    "image": "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/4734720/bc8143bc7fda6a914ef6fb86f332548863582bad/capsule_616x353.jpg?t=1795179676",
+    "summary": "Dark, cozy incremental crafting game about rebuilding yourself while stranded on a strange island.",
+    "platforms": ["PC", "Mac", "Linux"],
+    "genres": ["Incremental", "Crafting", "Casual"],
+    "starts": "2026-11-13",
+    "ends": "2026-11-30",
+    "similar_steam_apps": ["1454400", "1267910"]
+  },
+  {
+    "title": "CINDER CITY",
+    "studio": "BIG FIRE GAMES, NC",
+    "url": "https://player.gg/explore/games/361814-cinder-city/playtest",
+    "image": "https://assets-game.firstlook.gg/819/ee8c6af3-a35b-4ab3-9b3f-db4524d861ef.png",
+    "summary": "Open-world third-person shooter in a fallen near-future Seoul, fought alongside other players.",
+    "platforms": ["PC"],
+    "genres": ["Shooter", "Open world", "MMO"],
+    "starts": "2026-12-04",
+    "ends": "2026-12-06",
+    "similar_steam_apps": ["2221490", "1085660", "230410"]
+  }
+]
